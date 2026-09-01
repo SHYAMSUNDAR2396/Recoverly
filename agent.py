@@ -126,29 +126,39 @@ def train_delay_model(ledger: dict[str, pd.DataFrame]):
     return model, metrics
 
 
-def _row_features(state, b: pd.DataFrame) -> pd.DataFrame:
+def _row_features(state, b: pd.DataFrame, med_amt: dict[str, float] | None = None) -> pd.DataFrame:
     """One feature row for a live invoice state. `b` is buyers indexed by buyer_id."""
     due = pd.Timestamp(state.due_date)
+    buyer_median = (med_amt or {}).get(state.buyer_id)
+    if buyer_median and buyer_median > 0:
+        amount_rel = float(state.amount) / float(buyer_median)
+    else:
+        amount_rel = 1.0
+
     return pd.DataFrame([{
         "buyer_dbt_mean": b.dbt_mean.get(state.buyer_id, 0.0),
         "buyer_dbt_sd": b.dbt_sd.get(state.buyer_id, 0.0),
         "buyer_dispute_rate": b.dispute_rate.get(state.buyer_id, 0.0),
         "buyer_promise_keep": b.promise_keep_rate.get(state.buyer_id, 0.5),
-        "amount_rel": 1.0,
+        "amount_rel": amount_rel,
         "terms": state.terms,
         "quarter_end": int(due.month in (3, 6, 9, 12) and due.day >= 21),
     }])
 
 
-def make_risk_fn(clf, reg, buyers: pd.DataFrame, threshold: float = config.RISK_THRESHOLD):
+def make_risk_fn(clf, reg, buyers: pd.DataFrame, invoices: pd.DataFrame | None = None,
+                 threshold: float = config.RISK_THRESHOLD):
     """The cascade as one closure: state -> {p_late, expected_delay_days, severity, segment}.
 
     Model 2 (reg) is only evaluated when Model 1 (clf) clears `threshold`.
     """
     b = buyers.set_index("buyer_id")
+    med_amt = None
+    if invoices is not None and "buyer_id" in invoices and "amount" in invoices:
+        med_amt = invoices.groupby("buyer_id").amount.median().to_dict()
 
     def risk(state) -> dict:
-        X = _row_features(state, b)
+        X = _row_features(state, b, med_amt)
         p = round(float(clf.predict_proba(X)[:, 1][0]), 3)
         if p < threshold:
             return {"p_late": p, "expected_delay_days": None,

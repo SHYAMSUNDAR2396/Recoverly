@@ -108,6 +108,34 @@ def test_risk_cascade_gates_model2():
     assert hi["expected_delay_days"] == 18.0 and hi["severity"] == "moderate"
 
 
+def test_risk_cascade_computes_dynamic_amount_rel():
+    agent = pytest.importorskip("agent")
+
+    captured_X = []
+    class Clf:
+        def predict_proba(self, X):
+            captured_X.append(X.copy())
+            return np.array([[0.5, 0.5]])
+
+    class Reg:
+        def predict(self, X):
+            return np.array([10.0])
+
+    buyers = pd.DataFrame([dict(
+        buyer_id="BUY-X", dbt_mean=10, dbt_sd=3, dispute_rate=0.0, promise_keep_rate=0.5)])
+    invoices = pd.DataFrame([
+        dict(buyer_id="BUY-X", amount=50_000.0),
+        dict(buyer_id="BUY-X", amount=150_000.0),
+    ])  # median amount is 100,000.0
+
+    s = _state(amount=250_000.0)  # 250k / 100k = 2.5
+    fn = agent.make_risk_fn(Clf(), Reg(), buyers, invoices=invoices)
+    fn(s)
+
+    assert len(captured_X) == 1
+    assert np.isclose(captured_X[0]["amount_rel"].iloc[0], 2.5)
+
+
 def test_delay_model_trains_on_late_only(L):
     agent = pytest.importorskip("agent")
     train, _ = agent.train_test_split_by_date(L)

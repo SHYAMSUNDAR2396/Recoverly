@@ -39,7 +39,7 @@ def main(argv: list[str]) -> None:
     print("Model 1 (late classifier):", m1)
     print("Model 2 (delay regressor):", m2)
 
-    risk_fn = agent.make_risk_fn(clf, reg, L["buyers"])
+    risk_fn = agent.make_risk_fn(clf, reg, L["buyers"], invoices=L["invoices"])
     diagnose_fn = agent.make_diagnose_fn(L["buyers"], use_ollama=use_llm)
 
     audit, final = engine.run(L, diagnose_fn=diagnose_fn, risk_fn=risk_fn)
