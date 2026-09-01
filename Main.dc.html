@@ -1,0 +1,574 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #F7F7F7; font-family: 'Inter', system-ui, -apple-system, Arial, sans-serif; color: #191D1F; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: #1364F1; text-decoration: none; }
+    a:hover { color: #0E54CD; }
+    button { font-family: 'Inter', system-ui, -apple-system, Arial, sans-serif; }
+  </style>
+</helmet>
+
+<div style="min-height:1660px;background:#F7F7F7;">
+
+  <!-- ============ APP BAR ============ -->
+  <div style="background:#021331;padding:22px 64px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="#1364F1"></rect>
+        <path d="M7 17.5 L11.5 6.5 L15 6.5 L10.5 17.5 Z" fill="#FFFFFF"></path>
+        <path d="M12.5 12.5 L17 12.5 L14.5 17.5 L11 17.5 Z" fill="#A8C8FF"></path>
+      </svg>
+      <div>
+        <div style="font-size:20px;font-weight:600;line-height:1.2;color:#FFFFFF;letter-spacing:-.01em;">Recoverly</div>
+        <div style="font-size:12px;font-weight:400;line-height:1.4;color:#A8C8FF;margin-top:2px;">Receivables leverage agent</div>
+      </div>
+    </div>
+    <div style="text-align:right;font-size:12px;line-height:1.6;color:#8FA5C4;font-family:Menlo,'SF Mono',Consolas,monospace;">
+      Run 2026-08-31 &nbsp;·&nbsp; seed 42<br>300 invoices &nbsp;·&nbsp; treatment 210 / control 90
+    </div>
+  </div>
+
+  <!-- ============ TABS ============ -->
+  <div style="background:#FFFFFF;border-bottom:1px solid #DEE1E3;padding:0 64px;">
+    <button onClick="{{goQueue}}" style="{{queueTab}}">Queue</button>
+    <button onClick="{{goResults}}" style="{{resultsTab}}">Recovery results</button>
+    <button onClick="{{goLeverage}}" style="{{leverageTab}}">Leverage brief</button>
+  </div>
+
+  <div style="padding:32px 64px 40px;">
+
+  <!-- ============ QUEUE ============ -->
+  <sc-if value="{{showQueue}}" hint-placeholder-val="{{true}}">
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <div>
+        <div style="font-size:20px;font-weight:600;line-height:1.3;color:#191D1F;letter-spacing:-.01em;">Open invoices</div>
+        <div style="font-size:14px;line-height:1.5;color:#7B878E;margin-top:4px;">8 invoices in the recovery queue, ordered by slip risk.</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <sc-for list="{{segCounts}}" as="c" hint-placeholder-count="5">
+          <span style="{{c.style}}">{{c.label}}</span>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:24px;margin-top:22px;">
+
+      <!-- list -->
+      <div style="background:#FFFFFF;border:1px solid #DEE1E3;border-radius:12px;overflow:hidden;align-self:start;box-shadow:0 1px 2px rgba(2,19,49,.04);">
+        <div style="display:grid;grid-template-columns:96px 1.7fr 62px 54px 96px;gap:14px;padding:14px 20px;background:#F7F7F7;border-bottom:1px solid #DEE1E3;font-size:11px;font-weight:600;color:#7B878E;letter-spacing:.04em;text-transform:uppercase;">
+          <span>Invoice</span><span>Buyer</span><span>DBT</span><span>Risk</span><span>Segment</span>
+        </div>
+        <sc-for list="{{invoices}}" as="row" hint-placeholder-count="8">
+          <div onClick="{{row.onSelect}}" style="{{row.rowStyle}}">
+            <span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:13px;color:#4F585F;">{{row.id}}</span>
+            <span style="font-size:14px;font-weight:500;color:#191D1F;">{{row.buyer}}</span>
+            <span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:13px;color:#4F585F;">{{row.dbtLabel}}</span>
+            <span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:13px;color:#4F585F;">{{row.riskLabel}}</span>
+            <span style="{{row.chipStyle}}">{{row.chipLabel}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- detail -->
+      <div style="background:#FFFFFF;border:1px solid #DEE1E3;border-radius:12px;padding:24px;align-self:start;box-shadow:0 1px 2px rgba(2,19,49,.04);">
+        <div style="font-size:18px;font-weight:600;line-height:1.3;color:#191D1F;">{{selected.buyer}}</div>
+        <div style="font-size:12px;line-height:1.5;color:#7B878E;margin-top:3px;">{{selected.meta}}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-top:20px;padding-top:20px;border-top:1px solid #DEE1E3;">
+          <div><span style="display:block;font-size:11px;color:#7B878E;margin-bottom:3px;">Amount</span><span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:14px;font-weight:500;color:#191D1F;">{{selected.amount}}</span></div>
+          <div><span style="display:block;font-size:11px;color:#7B878E;margin-bottom:3px;">Terms</span><span style="font-size:14px;color:#191D1F;">{{selected.terms}}</span></div>
+          <div><span style="display:block;font-size:11px;color:#7B878E;margin-bottom:3px;">Issued</span><span style="font-size:14px;color:#191D1F;">{{selected.issued}}</span></div>
+          <div><span style="display:block;font-size:11px;color:#7B878E;margin-bottom:3px;">Due</span><span style="font-size:14px;color:#191D1F;">{{selected.due}}</span></div>
+          <div><span style="display:block;font-size:11px;color:#7B878E;margin-bottom:3px;">Days beyond terms</span><span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:14px;font-weight:500;color:#191D1F;">{{selected.dbt}}</span></div>
+          <div><span style="display:block;font-size:11px;color:#7B878E;margin-bottom:3px;">Expected</span><span style="font-size:14px;color:#191D1F;">{{selected.expected}}</span></div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:11px;color:#7B878E;">Slip risk</span>
+            <span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:13px;font-weight:500;color:#191D1F;">{{selected.risk}}</span>
+          </div>
+          <div style="height:6px;background:#E9EBEC;border-radius:9999px;overflow:hidden;margin-top:6px;"><div style="height:6px;border-radius:9999px;background:#1364F1;width:{{selected.riskPct}};"></div></div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <span style="{{selected.diagChip}}">{{selected.diag}}</span>
+          <div style="font-size:13px;line-height:1.6;color:#4F585F;margin-top:8px;">{{selected.diagNote}}</div>
+        </div>
+
+        <div style="margin-top:18px;padding:14px 16px;background:#F5F8FF;border:1px solid #D6E5FF;border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:11px;font-weight:500;color:#FFFFFF;background:#1364F1;border-radius:4px;padding:3px 7px;">{{selected.stage}}</span>
+            <span style="font-size:13px;font-weight:500;color:#0A44A9;">{{selected.stageName}}</span>
+          </div>
+          <div style="font-size:12px;line-height:1.5;color:#4F585F;margin-top:7px;">{{selected.stageNext}}</div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <div style="font-size:11px;color:#7B878E;margin-bottom:7px;">Bounds checked</div>
+          <sc-for list="{{selected.bounds}}" as="b" hint-placeholder-count="4">
+            <div style="font-family:Menlo,'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.9;color:#4F585F;white-space:pre;">{{b}}</div>
+          </sc-for>
+        </div>
+
+        <div style="border:1px solid #DEE1E3;background:#FCFCFD;border-radius:8px;padding:16px;margin-top:18px;">
+          <div style="font-size:11px;font-weight:600;color:#7B878E;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;">{{selected.msgLabel}}</div>
+          <div style="font-size:13px;line-height:1.7;color:#191D1F;white-space:pre-line;">{{selected.msg}}</div>
+          <sc-if value="{{selected.canSend}}" hint-placeholder-val="{{true}}">
+            <div style="margin-top:16px;">
+              <sc-if value="{{sent}}" hint-placeholder-val="{{false}}">
+                <span style="display:inline-block;font-size:12px;font-weight:500;color:#00753B;background:#E6F4ED;border-radius:9999px;padding:7px 14px;">Queued for send &nbsp;·&nbsp; 31 Aug, 17:20 IST</span>
+              </sc-if>
+              <sc-if value="{{notSent}}" hint-placeholder-val="{{true}}">
+                <button onClick="{{sendMsg}}" style="font-size:14px;font-weight:600;background:#1364F1;color:#FFFFFF;border:none;border-radius:8px;padding:11px 20px;cursor:pointer;">Approve &amp; send</button>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{selected.isEscalated}}" hint-placeholder-val="{{false}}">
+            <div style="margin-top:14px;display:inline-block;font-size:12px;font-weight:500;color:#AA180E;background:#FBE3E1;border-radius:9999px;padding:7px 14px;">Handed to a human &nbsp;·&nbsp; no autonomous send</div>
+          </sc-if>
+        </div>
+
+        <div style="margin-top:14px;font-family:Menlo,'SF Mono',Consolas,monospace;font-size:10.5px;line-height:1.7;color:#96A0A6;word-break:break-word;">{{selected.audit}}</div>
+      </div>
+
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ RESULTS ============ -->
+  <sc-if value="{{showResults}}" hint-placeholder-val="{{false}}">
+  <div>
+    <div style="font-size:20px;font-weight:600;line-height:1.3;color:#191D1F;letter-spacing:-.01em;">Recovery outcome</div>
+    <div style="font-size:14px;line-height:1.5;color:#7B878E;margin-top:4px;">Treatment group measured against a matched, untouched control.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;margin-top:22px;">
+      <sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+        <div style="background:#FFFFFF;border:1px solid #DEE1E3;border-radius:12px;padding:20px;box-shadow:0 1px 2px rgba(2,19,49,.04);">
+          <div style="font-size:11px;color:#7B878E;">{{s.label}}</div>
+          <div style="font-size:32px;font-weight:600;line-height:1.15;margin-top:8px;letter-spacing:-.02em;color:{{s.color}};">{{s.value}}</div>
+          <div style="font-size:12px;line-height:1.5;color:#7B878E;margin-top:6px;">{{s.sub}}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="background:#FFFFFF;border:1px solid #DEE1E3;border-radius:12px;overflow:hidden;margin-top:22px;box-shadow:0 1px 2px rgba(2,19,49,.04);">
+      <div style="display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:16px;padding:14px 20px;background:#F7F7F7;border-bottom:1px solid #DEE1E3;font-size:11px;font-weight:600;color:#7B878E;letter-spacing:.04em;text-transform:uppercase;">
+        <span>Metric</span><span>Treatment · 210</span><span>Control · 90</span>
+      </div>
+      <sc-for list="{{resultRows}}" as="r" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:16px;padding:14px 20px;border-bottom:1px solid #EEF0F1;font-size:14px;color:#191D1F;">
+          <span>{{r.metric}}</span>
+          <span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-weight:500;">{{r.treat}}</span>
+          <span style="font-family:Menlo,'SF Mono',Consolas,monospace;color:#7B878E;">{{r.ctrl}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#E7F7FD;border:1px solid #BEE7F8;border-radius:8px;padding:14px 16px;margin-top:18px;max-width:900px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071AB" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;">
+        <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 7.5v.5"></path>
+      </svg>
+      <div style="font-size:13px;line-height:1.65;color:#00567F;">
+        Control is 90 invoices matched on buyer profile and invoice size, with no agent contact. The treatment effect is produced by a benchmark-anchored response assumption (<span style="font-family:Menlo,'SF Mono',Consolas,monospace;">RESPONSE_LIFT</span>), shown on this screen and named as an assumption &mdash; the control group proves the measurement machinery is sound, not that the agent works.
+      </div>
+    </div>
+
+    <div style="font-size:16px;font-weight:600;color:#191D1F;margin-top:32px;">Exceptions</div>
+    <div style="font-size:14px;line-height:1.5;color:#7B878E;margin-top:4px;">4 invoices the agent could not resolve, and why.</div>
+    <div style="background:#FFFFFF;border:1px solid #DEE1E3;border-radius:12px;overflow:hidden;margin-top:14px;box-shadow:0 1px 2px rgba(2,19,49,.04);">
+      <sc-for list="{{exceptions}}" as="e" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:150px 1fr;gap:20px;padding:16px 20px;border-bottom:1px solid #EEF0F1;font-size:14px;line-height:1.6;color:#4F585F;align-items:start;">
+          <span style="{{e.tagStyle}}">{{e.tag}}</span>
+          <span><span style="font-family:Menlo,'SF Mono',Consolas,monospace;font-weight:500;color:#191D1F;">{{e.id}}</span> &mdash; {{e.reason}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ LEVERAGE ============ -->
+  <sc-if value="{{showLeverage}}" hint-placeholder-val="{{false}}">
+  <div>
+    <div style="font-size:20px;font-weight:600;line-height:1.3;color:#191D1F;letter-spacing:-.01em;">Leverage brief</div>
+    <div style="font-size:14px;line-height:1.5;color:#7B878E;margin-top:4px;">The negotiating position, built from this buyer&#39;s own payment record.</div>
+
+    <div style="display:flex;gap:8px;margin-top:18px;">
+      <sc-for list="{{levPills}}" as="p" hint-placeholder-count="3">
+        <button onClick="{{p.onPick}}" style="{{p.style}}">{{p.name}}</button>
+      </sc-for>
+    </div>
+
+    <div style="max-width:860px;margin-top:20px;background:#FFFFFF;border:1px solid #DEE1E3;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(2,19,49,.04);">
+
+      <div style="background:#021331;padding:26px 36px;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#A8C8FF;">Terms-revision brief &nbsp;·&nbsp; prepared 31 Aug 2026</div>
+        <div style="font-size:24px;font-weight:600;line-height:1.3;color:#FFFFFF;margin-top:10px;letter-spacing:-.015em;">{{lev.headline}}</div>
+        <div style="font-size:13px;line-height:1.5;color:#8FA5C4;margin-top:6px;">{{lev.basis}}</div>
+      </div>
+
+      <div style="padding:28px 36px 32px;">
+
+        <div style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#7B878E;">{{lev.agreed}} &mdash; settlement record</div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:10px;">
+          <sc-for list="{{lev.marks}}" as="m" hint-placeholder-count="24">
+            <span style="{{m.style}}"></span>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:#4F585F;">
+          <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:#3AA670;display:inline-block;"></span>{{lev.honoredLabel}}</span>
+          <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:#E86559;display:inline-block;"></span>{{lev.brokenLabel}}</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:24px;">
+          <div style="background:#F7F7F7;border-radius:8px;padding:16px;">
+            <div style="font-size:11px;color:#7B878E;">Mean days beyond terms</div>
+            <div style="font-size:24px;font-weight:600;color:#191D1F;margin-top:6px;letter-spacing:-.01em;">{{lev.dbt}}</div>
+            <div style="font-size:12px;color:#7B878E;margin-top:3px;">{{lev.dbtSub}}</div>
+          </div>
+          <div style="background:#F7F7F7;border-radius:8px;padding:16px;">
+            <div style="font-size:11px;color:#7B878E;">Promise-kept rate</div>
+            <div style="font-size:24px;font-weight:600;color:#191D1F;margin-top:6px;letter-spacing:-.01em;">{{lev.promise}}</div>
+            <div style="font-size:12px;color:#7B878E;margin-top:3px;">{{lev.promiseSub}}</div>
+          </div>
+          <div style="background:#F7F7F7;border-radius:8px;padding:16px;">
+            <div style="font-size:11px;color:#7B878E;">Dispute rate</div>
+            <div style="font-size:24px;font-weight:600;color:#191D1F;margin-top:6px;letter-spacing:-.01em;">{{lev.dispute}}</div>
+            <div style="font-size:12px;color:#7B878E;margin-top:3px;">{{lev.disputeSub}}</div>
+          </div>
+        </div>
+
+        <div style="font-size:15px;line-height:1.7;color:#191D1F;margin-top:24px;">{{lev.peer}}</div>
+
+        <div style="background:#F5F8FF;border:1px solid #D6E5FF;border-radius:8px;padding:20px 22px;margin-top:22px;">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#0E54CD;">Recommended terms</div>
+          <div style="font-size:16px;line-height:1.65;color:#021331;margin-top:9px;font-weight:500;">{{lev.rec}}</div>
+        </div>
+
+        <div style="margin-top:22px;">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#7B878E;">Justification</div>
+          <div style="font-size:14px;line-height:1.75;color:#4F585F;margin-top:9px;">{{lev.just}}</div>
+        </div>
+
+        <div style="border:1px solid #DEE1E3;background:#FCFCFD;border-radius:8px;padding:18px 20px;margin-top:22px;">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#7B878E;margin-bottom:10px;">Message to buyer&#39;s AP lead</div>
+          <div style="font-size:13px;line-height:1.75;color:#191D1F;white-space:pre-line;">{{lev.msg}}</div>
+          <div style="margin-top:16px;">
+            <sc-if value="{{sent}}" hint-placeholder-val="{{false}}">
+              <span style="display:inline-block;font-size:12px;font-weight:500;color:#00753B;background:#E6F4ED;border-radius:9999px;padding:7px 14px;">Queued for send &nbsp;·&nbsp; 31 Aug, 17:20 IST</span>
+            </sc-if>
+            <sc-if value="{{notSent}}" hint-placeholder-val="{{true}}">
+              <button onClick="{{sendMsg}}" style="font-size:14px;font-weight:600;background:#1364F1;color:#FFFFFF;border:none;border-radius:8px;padding:11px 20px;cursor:pointer;">Approve &amp; send</button>
+            </sc-if>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- footer -->
+  <div style="border-top:1px solid #DEE1E3;margin-top:40px;padding-top:16px;font-size:12px;color:#96A0A6;">
+    Recoverly &nbsp;·&nbsp; Razorpay AI Buildathon 2026 &nbsp;·&nbsp; Track 03, AI Revenue Recovery &nbsp;·&nbsp; prototype with sample data
+  </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":1660}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const view = st.view || 'queue';
+    const selId = st.selId || 'INV-2041';
+    const levId = st.levId || 'meridian';
+    const sent = !!st.sent;
+    const notSent = !sent;
+
+    // ---- Blade tab styles ----
+    const tabBase = "background:none;border:none;border-bottom:2px solid transparent;padding:16px 0;margin-right:32px;font-size:14px;font-weight:500;cursor:pointer;color:#4F585F;";
+    const tabOn = "background:none;border:none;border-bottom:2px solid #1364F1;padding:16px 0;margin-right:32px;font-size:14px;font-weight:600;cursor:pointer;color:#1364F1;";
+
+    // ---- segments, mapped to Blade feedback hues ----
+    const segs = {
+      on_track: { bg: '#E6F4ED', fg: '#00753B', label: 'On track' },
+      at_risk:  { bg: '#FFF0E5', fg: '#C75300', label: 'At risk' },
+      slipping: { bg: '#FFE3CC', fg: '#AD4800', label: 'Slipping' },
+      overdue:  { bg: '#FBE3E1', fg: '#AA180E', label: 'Overdue' },
+      chronic:  { bg: '#F6CFCC', fg: '#7A100B', label: 'Chronic' },
+    };
+    const chip = (s) => "display:inline-block;padding:3px 10px;border-radius:9999px;font-size:11px;font-weight:600;background:" + s.bg + ";color:" + s.fg + ";";
+
+    const rawInvoices = [
+      { id: 'INV-2041', buyer: 'Meridian Retail',  dbt: 18, risk: 0.86, segment: 'chronic' },
+      { id: 'INV-2067', buyer: 'Harbour Textiles', dbt: 31, risk: 0.91, segment: 'overdue' },
+      { id: 'INV-2033', buyer: 'Harbour Textiles', dbt: 47, risk: 0.88, segment: 'chronic' },
+      { id: 'INV-2038', buyer: 'Meridian Retail',  dbt: 9,  risk: 0.74, segment: 'slipping' },
+      { id: 'INV-2049', buyer: 'Crest Pharma',     dbt: 14, risk: 0.68, segment: 'slipping' },
+      { id: 'INV-2060', buyer: 'Meridian Retail',  dbt: 6,  risk: 0.63, segment: 'at_risk' },
+      { id: 'INV-2055', buyer: 'Blueleaf Foods',   dbt: 2,  risk: 0.41, segment: 'at_risk' },
+      { id: 'INV-2071', buyer: 'Nandi Logistics',  dbt: -3, risk: 0.12, segment: 'on_track' },
+    ];
+    const invoices = rawInvoices.map((inv) => {
+      const s = segs[inv.segment];
+      const isSel = inv.id === selId;
+      return {
+        id: inv.id,
+        buyer: inv.buyer,
+        dbtLabel: (inv.dbt >= 0 ? '+' : '−') + Math.abs(inv.dbt) + 'd',
+        riskLabel: inv.risk.toFixed(2),
+        chipLabel: s.label,
+        chipStyle: chip(s),
+        rowStyle: "display:grid;grid-template-columns:96px 1.7fr 62px 54px 96px;gap:14px;align-items:center;padding:15px 20px;cursor:pointer;border-bottom:1px solid #EEF0F1;border-left:3px solid " + (isSel ? '#1364F1' : 'transparent') + ";background:" + (isSel ? '#F5F8FF' : '#FFFFFF') + ";",
+        onSelect: () => this.setState({ selId: inv.id, sent: false }),
+      };
+    });
+
+    const segCounts = [
+      { label: '2 chronic', s: segs.chronic },
+      { label: '1 overdue', s: segs.overdue },
+      { label: '2 slipping', s: segs.slipping },
+      { label: '2 at risk', s: segs.at_risk },
+      { label: '1 on track', s: segs.on_track },
+    ].map((c) => ({ label: c.label, style: chip(c.s) }));
+
+    // ---- invoice detail ----
+    const details = {
+      'INV-2041': {
+        buyer: 'Meridian Retail', meta: 'Buyer since Mar 2024  ·  27 invoices  ·  Net 60',
+        amount: '₹8,40,000', terms: 'Net 60', issued: '12 Jun 2026', due: '11 Aug 2026',
+        dbt: '+18 days', expected: '~12 more days late', risk: '0.86', riskPct: '86%',
+        diag: 'Deliberate stretching', diagBg: '#F6CFCC', diagFg: '#7A100B',
+        diagNote: 'Days-beyond-terms drifted from 6 to 19 over four months with zero disputes and steady payment velocity — capacity to pay without intent.',
+        stage: 'Stage 2', stageName: 'Firm reminder, escalate to AP contact',
+        stageNext: 'Next rung at DBT 30 — payment-plan proposal.',
+        bounds: ['max_touches       3 / 6            PASS', 'min_gap_72h       108h since last  PASS', 'business_hours    Mon 14:20 IST    PASS', 'discount_cap_2pc  none proposed    PASS'],
+        mode: 'send',
+        msg: 'Hi Priya,\n\nInvoice INV-2041 (₹8,40,000) reached its Net 60 due date on 11 August and is now 18 days out. Could you confirm the payment date, or flag any issue on your end?\n\nPayment link: rzp.io/l/mrd-2041\n\nThanks,\nRavi',
+        audit: '2026-08-29T14:20:11+05:30 | INV-2041 | BUY-Meridian | 0.86 | deliberate_stretching | 2 | firm_reminder | sent | plink_Qh2f… | [max_touches,min_gap_72h,business_hours] | false | awaiting | —',
+      },
+      'INV-2067': {
+        buyer: 'Harbour Textiles', meta: 'Buyer since Jan 2024  ·  19 invoices  ·  Net 30',
+        amount: '₹12,50,000', terms: 'Net 30', issued: '02 Jul 2026', due: '01 Aug 2026',
+        dbt: '+31 days', expected: 'Held — dispute open', risk: '0.91', riskPct: '91%',
+        diag: 'Genuine dispute', diagBg: '#FBE3E1', diagFg: '#AA180E',
+        diagNote: 'Buyer raised a delivery-shortfall claim on day 6 of aging. Terminal stop condition — all autonomous contact halted.',
+        stage: 'Stage 5', stageName: 'Stopped, handed to human',
+        stageNext: 'No further agent action until the dispute is closed in the ledger.',
+        bounds: ['stop_condition      dispute_raised    TERMINAL', 'autonomous_contact  disabled', 'escalation_brief    generated', 'human_owner         A. Nair (AR lead)'],
+        mode: 'escalated',
+        msg: 'ESCALATION BRIEF\n\nINV-2067  ·  Harbour Textiles  ·  ₹12,50,000  ·  31 days beyond Net 30.\n\nDispute raised 22 Aug: buyer claims 40 units short on a 500-unit delivery.\nHistory: Harbour has disputed 4 of 19 invoices, all resolved in their favour within a week, all followed by payment within 2 days.\n\nRecommended: confirm the packing list against the GRN, then reference the dispute-window proposal in the leverage brief.',
+        audit: '2026-08-22T10:05:44+05:30 | INV-2067 | BUY-Harbour | 0.91 | genuine_dispute | 5 | escalate_to_human | brief_generated | — | [stop_condition:dispute_raised] | true | handed_off | 2026-08-22T10:05:44+05:30',
+      },
+      'INV-2033': {
+        buyer: 'Harbour Textiles', meta: 'Buyer since Jan 2024  ·  19 invoices  ·  Net 30',
+        amount: '₹4,40,000', terms: 'Net 30', issued: '20 May 2026', due: '19 Jun 2026',
+        dbt: '+47 days', expected: 'Held — opt-out on file', risk: '0.88', riskPct: '88%',
+        diag: 'Opt-out on file', diagBg: '#F6CFCC', diagFg: '#7A100B',
+        diagNote: 'Buyer requested no automated contact on 12 Jun. Terminal stop condition — invoice proceeds by human collections only.',
+        stage: 'Stage 5', stageName: 'Stopped, no autonomous contact',
+        stageNext: 'Manual follow-up owned by the AR lead. Agent tracks status only.',
+        bounds: ['stop_condition      buyer_opt_out    TERMINAL', 'autonomous_contact  disabled', 'ledger_tracking     active'],
+        mode: 'escalated',
+        msg: 'ESCALATION BRIEF\n\nINV-2033  ·  Harbour Textiles  ·  ₹4,40,000  ·  47 days beyond Net 30.\n\nBuyer opted out of automated contact on 12 Jun. No links, no messages sent since.\nThis is the oldest open item for Harbour and belongs in the terms conversation, not a reminder sequence.',
+        audit: '2026-06-12T16:41:09+05:30 | INV-2033 | BUY-Harbour | 0.88 | opt_out | 5 | suppress_all_contact | — | — | [stop_condition:buyer_opt_out] | true | manual_only | 2026-06-12T16:41:09+05:30',
+      },
+      'INV-2038': {
+        buyer: 'Meridian Retail', meta: 'Buyer since Mar 2024  ·  27 invoices  ·  Net 60',
+        amount: '₹6,20,000', terms: 'Net 60', issued: '20 Jun 2026', due: '19 Aug 2026',
+        dbt: '+9 days', expected: '~10 more days late', risk: '0.74', riskPct: '74%',
+        diag: 'Deliberate stretching', diagBg: '#FFE3CC', diagFg: '#AD4800',
+        diagNote: 'Same pattern as INV-2041 on the same buyer, earlier on the aging curve.',
+        stage: 'Stage 1', stageName: 'Polite follow-up, restate terms',
+        stageNext: 'Firm reminder and AP escalation at DBT 7 — due now, queued for the next run.',
+        bounds: ['max_touches     2 / 6            PASS', 'min_gap_72h     120h since last  PASS', 'business_hours  Mon 14:20 IST    PASS'],
+        mode: 'send',
+        msg: 'Hi Priya,\n\nInvoice INV-2038 (₹6,20,000) passed its due date on 19 August. Could you confirm when we can expect payment?\n\nrzp.io/l/mrd-2038\n\nThanks,\nRavi',
+        audit: '2026-08-28T14:20:55+05:30 | INV-2038 | BUY-Meridian | 0.74 | deliberate_stretching | 1 | polite_follow_up | sent | plink_Lp3x… | [max_touches,min_gap_72h,business_hours] | false | awaiting | —',
+      },
+      'INV-2049': {
+        buyer: 'Crest Pharma', meta: 'Buyer since Feb 2024  ·  17 invoices  ·  Net 45',
+        amount: '₹5,75,000', terms: 'Net 45', issued: '01 Jun 2026', due: '16 Jul 2026',
+        dbt: '+14 days', expected: '~6 more days late', risk: '0.68', riskPct: '68%',
+        diag: 'Cash-flow (seasonal)', diagBg: '#FFF0E5', diagFg: '#C75300',
+        diagNote: 'Slippage confined to Mar and Sep across 17 invoices, tracking Crest’s own receivables cycle. Not a discipline issue.',
+        stage: 'Stage 3', stageName: 'Early-settlement offer, discount ≤ 2%',
+        stageNext: 'If unaccepted by DBT 30, move to a payment-plan proposal.',
+        bounds: ['max_touches       4 / 6            PASS', 'min_gap_72h       96h since last   PASS', 'discount_cap_2pc  1.5% offered     PASS', 'maker_checker     ₹5.75L < ₹15L   PASS'],
+        mode: 'send',
+        msg: 'Hi Anjali,\n\nInvoice INV-2049 (₹5,75,000) is 14 days past its Net 45 date. We can offer a 1.5% early-settlement discount if it clears by 5 September — net ₹5,66,375.\n\nrzp.io/l/crt-2049\n\nBest,\nRavi',
+        audit: '2026-08-01T11:12:30+05:30 | INV-2049 | BUY-Crest | 0.68 | cashflow_seasonal | 3 | early_settlement_offer | sent | plink_Rk9m… | [max_touches,min_gap_72h,discount_cap_2pc,maker_checker] | false | offer_open | —',
+      },
+      'INV-2060': {
+        buyer: 'Meridian Retail', meta: 'Buyer since Mar 2024  ·  27 invoices  ·  Net 60',
+        amount: '₹9,05,000', terms: 'Net 60', issued: '28 Jun 2026', due: '27 Aug 2026',
+        dbt: '+6 days', expected: '~11 more days late', risk: '0.63', riskPct: '63%',
+        diag: 'Deliberate stretching', diagBg: '#FFF0E5', diagFg: '#C75300',
+        diagNote: 'Third open Meridian invoice showing the same drift. Reinforces the terms-revision case in the leverage brief.',
+        stage: 'Stage 1', stageName: 'Polite follow-up, restate terms',
+        stageNext: 'Firm reminder at DBT 7.',
+        bounds: ['max_touches     1 / 6           PASS', 'min_gap_72h     first touch      —', 'business_hours  Mon 14:21 IST   PASS'],
+        mode: 'send',
+        msg: 'Hi Priya,\n\nInvoice INV-2060 (₹9,05,000) is a few days past its Net 60 date. A confirmed payment date would help us close the August ledger.\n\nrzp.io/l/mrd-2060\n\nThanks,\nRavi',
+        audit: '2026-08-29T14:21:40+05:30 | INV-2060 | BUY-Meridian | 0.63 | deliberate_stretching | 1 | polite_follow_up | sent | plink_Wm4a… | [max_touches,business_hours] | false | awaiting | —',
+      },
+      'INV-2055': {
+        buyer: 'Blueleaf Foods', meta: 'Buyer since Nov 2024  ·  9 invoices  ·  Net 45',
+        amount: '₹3,10,000', terms: 'Net 45', issued: '25 Jul 2026', due: '08 Sep 2026',
+        dbt: '+2 days', expected: 'Low confidence', risk: '0.41', riskPct: '41%',
+        diag: 'Process issue', diagBg: '#FFF0E5', diagFg: '#C75300',
+        diagNote: 'Two prior Blueleaf invoices were paid within 3 days of a resend — invoices miss their AP intake, not their budget.',
+        stage: 'Stage 0', stageName: 'Pre-due courtesy, confirm AP receipt',
+        stageNext: 'Escalate to a named AP contact at DBT 7 if unconfirmed.',
+        bounds: ['max_touches     1 / 6           PASS', 'business_hours  Mon 14:21 IST   PASS'],
+        mode: 'send',
+        msg: 'Hi Farah,\n\nConfirming invoice INV-2055 (₹3,10,000) reached your AP inbox on 25 July — could you acknowledge it is in the system? Resending the PDF and link below in case.\n\nrzp.io/l/blf-2055\n\nThanks,\nRavi',
+        audit: '2026-08-30T14:21:03+05:30 | INV-2055 | BUY-Blueleaf | 0.41 | process_issue | 0 | confirm_ap_receipt | sent | plink_Tz8w… | [max_touches,business_hours] | false | awaiting_ack | —',
+      },
+      'INV-2071': {
+        buyer: 'Nandi Logistics', meta: 'Buyer since Aug 2024  ·  14 invoices  ·  Net 30',
+        amount: '₹1,90,000', terms: 'Net 30', issued: '05 Aug 2026', due: '04 Sep 2026',
+        dbt: '−3 days', expected: 'On or before due date', risk: '0.12', riskPct: '12%',
+        diag: 'No action required', diagBg: '#E6F4ED', diagFg: '#00753B',
+        diagNote: 'Nandi has honored 13 of 14 invoices early. No touch scheduled before the pre-due courtesy at day −5.',
+        stage: 'Stage 0', stageName: 'Monitoring, pre-due courtesy pending',
+        stageNext: 'Courtesy reminder and link queue on 30 Aug.',
+        bounds: ['max_touches     0 / 6                     PASS', 'schedule        pre_due_courtesy @ 30 Aug', 'business_hours  —'],
+        mode: 'send',
+        msg: 'Hi Sunil,\n\nA quick heads-up that invoice INV-2071 (₹1,90,000) is due on 4 September. Payment link below for convenience — no action needed if it is already scheduled.\n\nrzp.io/l/nnd-2071\n\nThanks,\nRavi',
+        audit: '2026-08-25T09:00:00+05:30 | INV-2071 | BUY-Nandi | 0.12 | none | 0 | scheduled | pending | — | [max_touches,schedule] | false | monitoring | —',
+      },
+    };
+    const rawSel = details[selId] || details['INV-2041'];
+    const selected = Object.assign({}, rawSel, {
+      diagChip: "display:inline-block;padding:4px 11px;border-radius:9999px;font-size:12px;font-weight:600;background:" + rawSel.diagBg + ";color:" + rawSel.diagFg + ";",
+      canSend: rawSel.mode === 'send',
+      isEscalated: rawSel.mode === 'escalated',
+      msgLabel: rawSel.mode === 'send' ? 'Drafted message' : 'Escalation brief',
+    });
+
+    // ---- results ----
+    const stats = [
+      { label: 'At-risk value recovered', value: '₹41.2L', sub: '+₹12.6L versus control', color: '#00753B' },
+      { label: 'DSO reduction', value: '9.4 days', sub: '67.7 → 58.3 days', color: '#191D1F' },
+      { label: 'Cash-days pulled forward', value: '₹3.1M', sub: 'economic value of acceleration', color: '#191D1F' },
+      { label: 'Net benefit', value: '₹1.84L', sub: 'after ₹22.4k discount cost', color: '#1364F1' },
+    ];
+    const resultRows = [
+      { metric: 'At-risk value recovered', treat: '71%', ctrl: '49%' },
+      { metric: 'Mean days sales outstanding', treat: '58.3 d', ctrl: '67.7 d' },
+      { metric: 'Promise-kept rate', treat: '0.62', ctrl: '—' },
+      { metric: 'Early-settlement discount cost', treat: '₹22,400', ctrl: '₹0' },
+      { metric: 'Collection touches spent', treat: '684', ctrl: '0' },
+      { metric: 'Disputes escalated to human', treat: '3', ctrl: '1' },
+    ];
+    const tag = (bg, fg) => "display:inline-block;font-size:11px;font-weight:600;background:" + bg + ";color:" + fg + ";padding:4px 10px;border-radius:4px;align-self:start;";
+    const exceptions = [
+      { tag: 'Escalated', tagStyle: tag('#FBE3E1', '#AA180E'), id: 'INV-2067 · Harbour Textiles', reason: 'dispute raised on a delivery shortfall, handed to a human on day 6.' },
+      { tag: 'Opt-out', tagStyle: tag('#F6CFCC', '#7A100B'), id: 'INV-2033 · Harbour Textiles', reason: 'buyer opt-out on file; no autonomous contact permitted, manual collections only.' },
+      { tag: 'Partial', tagStyle: tag('#FFE3CC', '#AD4800'), id: 'INV-2049 · Crest Pharma', reason: '₹2.1L of ₹5.75L settled; the remainder is on an agreed payment plan.' },
+      { tag: 'Maker-checker', tagStyle: tag('#FFF0E5', '#C75300'), id: 'INV-2088 · Meridian Retail', reason: '₹15.0L exceeds the autonomous-action threshold; awaiting sign-off.' },
+    ];
+
+    // ---- leverage ----
+    const marksArr = (h, b) => {
+      const a = [];
+      for (let i = 0; i < h; i++) a.push({ style: 'width:10px;height:20px;background:#3AA670;border-radius:2px;' });
+      for (let i = 0; i < b; i++) a.push({ style: 'width:10px;height:20px;background:#E86559;border-radius:2px;' });
+      return a;
+    };
+    const levs = {
+      meridian: {
+        name: 'Meridian Retail',
+        headline: 'Meridian Retail — proposed move to Net 45',
+        basis: '27 invoices  ·  Mar 2024 – Aug 2026  ·  Net 60 throughout',
+        agreed: 'Net 60 agreed', h: 9, b: 18, honoredLabel: 'Honored 9', brokenLabel: 'Broken 18',
+        dbt: '+17.4 d', dbtSub: 'σ 6.1 days',
+        promise: '0.58', promiseSub: '12 promises on record',
+        dispute: '0.0%', disputeSub: 'no disputes in 27 invoices',
+        peer: 'Buyers on Net 60 in the same segment settle at +3.2 days on average. Meridian settles at +17.4 — a 14-day drift with no disputes and stable payment velocity.',
+        rec: 'Move to Net 45 with a 1.5% early-settlement discount if paid by day 20. The shorter term absorbs the observed drift; the discount gives Meridian a concrete reason to hold the new date.',
+        just: 'Meridian has never disputed an invoice and has never missed a payment outright — every rupee has been collected. The issue is timing: mean days-beyond-terms has climbed from 6 to 19 over four quarters while order volume rose 40%. They are using the invoice as working capital because the current terms let them. A tighter term with a small carrot resets the anchor without threatening the relationship, and the honored / broken record on this page is the evidence to put on the table.',
+        msg: 'Hi Priya,\n\nAhead of the Q3 order I wanted to align on payment terms. Across the last 27 invoices, settlement has averaged 17 days beyond the Net 60 we agreed. We value the volume Meridian sends us and want to keep it growing, so we would like to move to Net 45 with a 1.5% discount for payment within 20 days.\n\nHappy to walk through the invoice history on a call this week.\n\nBest,\nRavi',
+      },
+      harbour: {
+        name: 'Harbour Textiles',
+        headline: 'Harbour Textiles — dispute-window condition',
+        basis: '19 invoices  ·  Jan 2024 – Aug 2026  ·  Net 30',
+        agreed: 'Net 30 agreed', h: 4, b: 15, honoredLabel: 'Honored 4', brokenLabel: 'Broken 15',
+        dbt: '+38 d', dbtSub: 'σ 11.2 days',
+        promise: '0.31', promiseSub: '13 promises on record',
+        dispute: '22%', disputeSub: 'raised on 4 of 19 invoices',
+        peer: 'Disputes cluster at day 25–30, resolve within a week, and are followed by payment within 2 days. The timing is consistent with a stall, not a quality problem.',
+        rec: 'Add a terms condition: disputes must be raised within 7 days of delivery to pause the clock. Disputes raised later are logged but non-blocking, and the invoice keeps aging.',
+        just: 'Harbour disputes roughly one invoice in five, always late in the payment cycle, always resolved quickly in your favour, and always just before they pay. No dispute has ever produced a credit note or a returned shipment. A 7-day dispute window is standard in B2B supply terms and costs an honest buyer nothing; it removes the stall lever entirely and gives you a clean basis to keep aging the invoice.',
+        msg: 'Hi Deepak,\n\nWe would like to add one clause to our supply terms: any dispute on quantity or quality is raised within 7 days of delivery. Disputes after that window stay on record but do not pause payment.\n\nThis matches standard practice and helps both sides close invoices faster. Can we confirm this for orders from September?\n\nBest,\nRavi',
+      },
+      crest: {
+        name: 'Crest Pharma',
+        headline: 'Crest Pharma — seasonal split schedule',
+        basis: '17 invoices  ·  Feb 2024 – Aug 2026  ·  Net 45',
+        agreed: 'Net 45 agreed', h: 11, b: 6, honoredLabel: 'Honored 11', brokenLabel: 'Broken 6',
+        dbt: '+9 d', dbtSub: 'σ 4.0 days',
+        promise: '0.83', promiseSub: '6 promises on record',
+        dispute: '0.0%', disputeSub: 'no disputes in 17 invoices',
+        peer: 'Slippage is concentrated in March and September and absent the rest of the year — it tracks Crest’s own receivables cycle, not a payment-discipline problem.',
+        rec: 'Keep Net 45. For Q1 and Q3 invoices only, offer a scheduled 60/40 split at Net 30 and Net 60. Leave the other three quarters unchanged.',
+        just: 'Crest is your most reliable large buyer: two-thirds of invoices honored on time, every promise-to-pay kept but one, zero disputes. The six late payments all fall in two months of the year and clear within nine days. This is not a buyer to pressure — it is a buyer to accommodate narrowly. A split schedule for their tight quarters costs almost nothing in cash-days and buys goodwill with an account worth keeping.',
+        msg: 'Hi Anjali,\n\nWe have noticed March and September run tight on your side. For invoices in those quarters we would be glad to move to a 60/40 split — 60% at Net 30, the balance at Net 60 — and keep Net 45 as-is for the rest of the year.\n\nLet us know if that helps for the upcoming cycle.\n\nBest,\nRavi',
+      },
+    };
+    const L = levs[levId] || levs.meridian;
+    const lev = Object.assign({}, L, { marks: marksArr(L.h, L.b) });
+
+    const pillBase = "font-size:14px;font-weight:500;padding:9px 16px;border:1px solid #C8CDD0;background:#FFFFFF;border-radius:8px;cursor:pointer;color:#4F585F;";
+    const pillOn = "font-size:14px;font-weight:600;padding:9px 16px;border:1px solid #1364F1;background:#1364F1;border-radius:8px;cursor:pointer;color:#FFFFFF;";
+    const levPills = [
+      { key: 'meridian', name: 'Meridian Retail' },
+      { key: 'harbour', name: 'Harbour Textiles' },
+      { key: 'crest', name: 'Crest Pharma' },
+    ].map((p) => ({
+      name: p.name,
+      style: p.key === levId ? pillOn : pillBase,
+      onPick: () => this.setState({ levId: p.key, sent: false }),
+    }));
+
+    return {
+      showQueue: view === 'queue',
+      showResults: view === 'results',
+      showLeverage: view === 'leverage',
+      queueTab: view === 'queue' ? tabOn : tabBase,
+      resultsTab: view === 'results' ? tabOn : tabBase,
+      leverageTab: view === 'leverage' ? tabOn : tabBase,
+      goQueue: () => this.setState({ view: 'queue' }),
+      goResults: () => this.setState({ view: 'results' }),
+      goLeverage: () => this.setState({ view: 'leverage' }),
+      invoices,
+      segCounts,
+      selected,
+      sent,
+      notSent,
+      stats,
+      resultRows,
+      exceptions,
+      levPills,
+      lev,
+      sendMsg: () => this.setState({ sent: true }),
+    };
+  }
+}
+</script>
+</body>
+</html>

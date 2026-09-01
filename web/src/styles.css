@@ -1,0 +1,9 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #F7F7F7; color: #191D1F;
+  font-family: "Inter", system-ui, -apple-system, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased; }
+button { font-family: inherit; }
+a { color: #1364F1; text-decoration: none; }
+a:hover { color: #0E54CD; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #DEE1E3; border-radius: 5px; }

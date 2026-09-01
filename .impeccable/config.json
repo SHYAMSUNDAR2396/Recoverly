@@ -1,0 +1,22 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-08-31T16:13:47.548Z",
+        "reason": "Razorpay Blade brand font, user-requested"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "web/src/App.jsx"
+        ],
+        "createdAt": "2026-08-31T16:13:56.070Z"
+      }
+    ]
+  }
+}
