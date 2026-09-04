@@ -67,3 +67,10 @@ RESPONSE_LIFT = {
 # --- promise loop ----------------------------------------------------------
 PROMISE_WINDOW_DAYS = 12          # a promise buys this many quiet days if none stated
 BROKEN_PROMISES_TO_STOP = 2      # 2nd broken promise (buyer-level) -> stop honoring
+
+# --- outbound / notifications --------------------------------------------------
+SME_NAME = "Northwind Components"                    # the SME Recoverly runs collections for
+SME_SIGNATORY = "Ravi Menon"                         # signs the buyer emails
+RAZORPAY_LINK_NOTIFY = {"sms": True, "email": False}  # Razorpay sends the SMS nudge;
+                                                     # the personalised email is notify.py's job
+RAZORPAY_LINK_REMINDERS = True                       # Razorpay's own escalating link reminders

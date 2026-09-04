@@ -38,6 +38,18 @@ _FILLER_NAMES = [
     "Northgate Retail", "Oakhaven Supply", "Pinecrest Foods",
 ]
 
+# synthetic AP contacts. `.example` is IANA-reserved -> no real inbox is reachable.
+_AP_FIRST = ["Priya", "Deepak", "Anjali", "Farah", "Sunil", "Meera", "Arjun",
+             "Kavya", "Rohan", "Nisha", "Vikram", "Sneha"]
+_AP_LAST = ["Sharma", "Nair", "Iyer", "Patel", "Reddy", "Bose", "Khanna", "Menon"]
+
+
+def _slug(name: str) -> str:
+    s = "".join(c.lower() if c.isalnum() else "-" for c in name)
+    while "--" in s:
+        s = s.replace("--", "-")
+    return s.strip("-")
+
 
 def _month_end_squeeze(due: dt.date, squeeze: float) -> float:
     """Quarter-end buyers pay slower on invoices due in the last 10 days of Mar/Jun/Sep/Dec."""
@@ -49,7 +61,8 @@ def _month_end_squeeze(due: dt.date, squeeze: float) -> float:
 def _build_buyers(rng: np.random.Generator) -> pd.DataFrame:
     rows = []
     names = list(NAMED_BUYERS) + _FILLER_NAMES
-    for i, name in enumerate(names):
+    crng = np.random.default_rng(config.SEED ^ 0x5EED)   # separate stream: contacts don't
+    for i, name in enumerate(names):                     # perturb the ledger's numbers
         if name in NAMED_BUYERS:
             (tier, dbt_mean, dbt_sd, qend, partial, disp, opt, prom, keep, resp) = NAMED_BUYERS[name]
         else:
@@ -63,6 +76,7 @@ def _build_buyers(rng: np.random.Generator) -> pd.DataFrame:
             prom = float(rng.uniform(0.2, 0.6))
             keep = float(rng.uniform(0.35, 0.9))
             resp = float(rng.uniform(0.3, 0.8))
+        ap = f"{_AP_FIRST[crng.integers(len(_AP_FIRST))]} {_AP_LAST[crng.integers(len(_AP_LAST))]}"
         rows.append(dict(
             buyer_id=f"BUY-{i:02d}", name=name, tier=tier,
             dbt_mean=round(dbt_mean, 1), dbt_sd=round(dbt_sd, 1),
@@ -70,6 +84,8 @@ def _build_buyers(rng: np.random.Generator) -> pd.DataFrame:
             dispute_rate=round(disp, 2), will_opt_out=opt,
             promise_rate=round(prom, 2), promise_keep_rate=round(keep, 2),
             responsiveness=round(resp, 2),
+            ap_contact=ap, email=f"ap@{_slug(name)}.example",
+            phone=f"+9198{int(crng.integers(10_000_000, 99_999_999))}",
         ))
     return pd.DataFrame(rows)
 

@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 import config
+import notify
 import razorpay_link
 
 # --- hard bounds: one list, consumed by the engine, the tests and the audit ---
@@ -96,15 +97,26 @@ _NO_RISK = {"p_late": float("nan"), "expected_delay_days": None,
             "severity": None, "segment": None}
 
 
-def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None,
-        force_discount: dict[str, float] | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _fallback_compose(f: dict) -> str:
+    return f"{f['invoice_id']} ({f['amount_inr']}) - {f.get('pay_url') or 'contact AR'}"
+
+
+def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None, compose_fn=None,
+        force_discount: dict[str, float] | None = None,
+        live_link_invoice: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Run the simulation. Returns (audit_df, invoices_final_df).
 
     risk_fn(state) -> {p_late, expected_delay_days, severity, segment}  (see
     agent.make_risk_fn). Informational only - the ladder does not read it.
+
+    compose_fn(facts) -> the buyer-facing email body (see agent.make_compose_fn).
+
+    live_link_invoice: if set, that one invoice's payment link is created for
+    real (Razorpay test mode); every other link is simulated.
     """
     diagnose_fn = diagnose_fn or (lambda inv, ctx: "undiagnosed")
     risk_fn = risk_fn or (lambda inv: dict(_NO_RISK))
+    compose_fn = compose_fn or _fallback_compose
     force_discount = force_discount or {}
 
     invoices = ledger["invoices"].copy()
@@ -217,15 +229,47 @@ def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None,
                    "touches": s.touches, "terms": s.terms,
                    "p_late": risk.get("p_late"), "expected_delay": risk.get("expected_delay_days")}
             diag = diagnose_fn(s, ctx)
-            link = (razorpay_link.create_link(s.invoice_id, s.amount, live=False)
-                    if stage in (0, 3) else None)
+
+            b = buyers.loc[s.buyer_id] if s.buyer_id in buyers.index else None
+            customer = ({"name": b["ap_contact"], "email": b["email"], "contact": b["phone"]}
+                        if b is not None else None)
+            link = pay_url = None
+            if stage in (0, 3):
+                res = razorpay_link.create_link(
+                    s.invoice_id, s.amount, live=(s.invoice_id == live_link_invoice),
+                    customer=customer, notify=config.RAZORPAY_LINK_NOTIFY,
+                    reminders=config.RAZORPAY_LINK_REMINDERS, with_url=True)
+                link, pay_url = res["id"], res["short_url"]
+
+            disc = None
+            if stage == 3 and diag == "cashflow":
+                net = s.amount * (1 - config.EARLY_SETTLEMENT_DISCOUNT)
+                disc = (f"We can offer a {config.EARLY_SETTLEMENT_DISCOUNT:.1%} early-settlement "
+                        f"discount if it is cleared within 7 days - net ₹{net:,.0f}.")
+
+            facts = {
+                "buyer": b["name"] if b is not None else s.buyer_id,
+                "ap_first": b["ap_contact"].split()[0] if b is not None else None,
+                "invoice_id": s.invoice_id, "amount_inr": f"₹{s.amount:,.0f}",
+                "terms": s.terms, "due_date": s.due_date.isoformat(), "dbt": dbt,
+                "stage": stage, "diagnosis": diag, "touch_no": s.touches + 1,
+                "prior_promise_broken": s.promise_kept is False,
+                "pay_url": pay_url, "discount_line": disc,
+                "signatory": config.SME_SIGNATORY, "sme_name": config.SME_NAME,
+            }
+            body = compose_fn(facts)
+            to = b["email"] if b is not None else "unknown@unknown.example"
+            subject = f"{s.invoice_id}: payment {_STAGE_ACTION[stage].replace('_', ' ')}"
+            msg_id = notify.send(to, subject, body, live=False)
+
             s.touches += 1
             s.last_touch_day = day
             s.last_stage = stage
             audit.append(_row(s, day, stage=stage, action=_STAGE_ACTION[stage],
                               diagnosis=diag, risk=risk, link=link,
                               bounds_passed=passed, human_gate=False,
-                              message=_message(_STAGE_ACTION[stage], s, dbt)))
+                              message=_message(_STAGE_ACTION[stage], s, dbt),
+                              email_to=to, email_body=body, email_message_id=msg_id))
 
         # 4. settle
         for s in st.values():
@@ -260,7 +304,7 @@ def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None,
 # --- helpers ---------------------------------------------------------------
 
 def _row(s: _State, day, *, stage, action, diagnosis, risk, link, bounds_passed,
-         human_gate, message) -> dict:
+         human_gate, message, email_to="", email_body="", email_message_id="") -> dict:
     return dict(
         timestamp=_stamp(s.invoice_id, day), invoice_id=s.invoice_id, buyer_id=s.buyer_id,
         risk_score=risk.get("p_late"), expected_delay_days=risk.get("expected_delay_days"),
@@ -268,6 +312,7 @@ def _row(s: _State, day, *, stage, action, diagnosis, risk, link, bounds_passed,
         diagnosis=diagnosis, ladder_stage=stage, action_taken=action,
         message_sent=message, razorpay_object_id=link,
         bounds_checked=",".join(bounds_passed), human_gate_required=human_gate,
+        email_to=email_to, email_body=email_body, email_message_id=email_message_id,
         outcome="pending", outcome_timestamp=pd.NaT,
     )
 

@@ -215,6 +215,20 @@ function InvoiceDetail({ id, row }) {
         </div>
       )}
 
+      {(() => {
+        const em = audit && [...audit].reverse().find((a) => a.email_body);
+        return em ? (
+          <div style={{ marginTop: 18, border: `1px solid ${C.bd}`, borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: C.paper, borderBottom: `1px solid ${C.bd}`,
+              fontSize: 11, color: C.mute }}>
+              Email to <b>{em.email_to}</b> · dry-run ({em.email_message_id})
+            </div>
+            <pre style={{ margin: 0, padding: "12px 14px", fontFamily: "inherit", fontSize: 13,
+              lineHeight: 1.6, whiteSpace: "pre-wrap", color: C.ink }}>{em.email_body}</pre>
+          </div>
+        ) : null;
+      })()}
+
       <div style={{ marginTop: 18, fontSize: 11, color: C.mute, marginBottom: 7 }}>Audit trail</div>
       {!audit ? <Loading /> : audit.length === 0
         ? <div style={{ fontSize: 13, color: C.mute }}>No agent actions recorded (control group, or never reached a rung).</div>

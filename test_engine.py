@@ -34,6 +34,7 @@ def _mini(invoices, events=None):
         buyer_id="BUY-X", name="Test Co", tier="light", dbt_mean=10, dbt_sd=3,
         qend_squeeze=0.0, partial_rate=0.0, dispute_rate=0.0, will_opt_out=False,
         promise_rate=0.0, promise_keep_rate=0.5, responsiveness=0.5,
+        ap_contact="Test Contact", email="ap@test-co.example", phone="+919800000000",
     )])
     base = dict(buyer_id="BUY-X", amount=200_000.0, terms=30, group="treatment",
                 disputed=False, held=False)
@@ -321,7 +322,7 @@ def test_audit_has_full_schema(run_result):
     expected = {"timestamp", "invoice_id", "buyer_id", "risk_score", "expected_delay_days",
                 "risk_severity", "risk_segment", "diagnosis", "ladder_stage", "action_taken",
                 "message_sent", "razorpay_object_id", "bounds_checked", "human_gate_required",
-                "outcome", "outcome_timestamp"}
+                "email_to", "email_body", "email_message_id", "outcome", "outcome_timestamp"}
     assert expected <= set(audit.columns)
     assert audit.outcome.isin({"paid", "handed_off", "unresolved"}).all()
 
@@ -340,3 +341,68 @@ def test_business_hour_timestamps(run_result):
     assert ts.dt.hour.between(config.BUSINESS_HOUR_START, config.BUSINESS_HOUR_END - 1).all()
     acted = audit[audit.action_taken.str.contains("reminder|courtesy|follow_up|offer|plan")]
     assert (pd.to_datetime(acted.timestamp).dt.weekday < 5).all()
+
+
+# --------------------------------------------------------------------------- #
+# buyer-facing email - composed on active rungs, never on a terminal stop
+# --------------------------------------------------------------------------- #
+
+_ACTED = ["pre_due_courtesy", "polite_follow_up", "firm_reminder",
+          "early_settlement_offer", "payment_plan"]
+
+
+def test_email_composed_for_active_rungs(run_result):
+    audit, _ = run_result
+    acted = audit[audit.action_taken.isin(_ACTED)]
+    assert (acted.email_body.str.len() > 0).all()
+    assert (acted.email_to.str.endswith(".example")).all()
+    assert (acted.email_message_id.str.startswith("msg_sim_")).all()
+
+
+def test_no_buyer_email_on_terminal_stop():
+    due = dt.date(2026, 2, 1)
+    L = _mini(
+        [dict(invoice_id="INV-D", due_date=due),
+         dict(invoice_id="INV-O", due_date=due)],
+        [("INV-D", "BUY-X", due + dt.timedelta(days=5), "dispute", pd.NaT),
+         ("INV-O", "BUY-X", due + dt.timedelta(days=5), "opt_out", pd.NaT)],
+    )
+    audit, _ = engine.run(L)
+    esc = audit[audit.action_taken == "escalate_to_human"]
+    assert len(esc) == 2
+    assert (esc.email_body == "").all()
+
+
+def test_email_body_keeps_link_and_amount(run_result):
+    audit, _ = run_result
+    linked = audit[audit.action_taken.isin(["pre_due_courtesy", "early_settlement_offer"])
+                   & (audit.razorpay_object_id.notna())].head(20)
+    assert len(linked)
+    for r in linked.itertuples():
+        assert "₹" in r.email_body
+        # the internal diagnosis label / brief must never leak to the buyer
+        low = r.email_body.lower()
+        assert not any(w in low for w in ("cashflow", "stretch", "leverage brief", "model"))
+        assert len(r.email_body) <= 1400
+
+
+def test_email_deterministic(L):
+    a1, _ = engine.run(L)
+    a2, _ = engine.run(L)
+    pd.testing.assert_series_equal(a1.email_body, a2.email_body)
+
+
+def test_razorpay_link_accepts_customer_kwargs():
+    import razorpay_link
+    res = razorpay_link.create_link("INV-9", 250_000.0, live=False, with_url=True,
+                                    customer={"name": "A", "email": "a@x.example", "contact": "+910"},
+                                    notify={"sms": True, "email": False})
+    assert res["id"].startswith("plink_sim_")
+    assert res["short_url"].startswith("https://rzp.io/i/")
+    assert isinstance(razorpay_link.create_link("INV-9", 250_000.0, live=False), str)
+
+
+def test_notify_send_simulated():
+    import notify
+    mid = notify.send("ap@harbour.example", "INV-1: payment reminder", "body text")
+    assert mid.startswith("msg_sim_")

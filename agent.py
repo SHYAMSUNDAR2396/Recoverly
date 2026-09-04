@@ -213,15 +213,16 @@ def _ollama(prompt: str, timeout: float = 8.0) -> str | None:
         return None
 
 
-def _load_cache() -> dict:
-    if _CACHE_PATH.exists():
-        return json.loads(_CACHE_PATH.read_text())
-    return {}
+_EMAIL_CACHE_PATH = config.DATA_DIR / "email_cache.json"
 
 
-def _save_cache(c: dict) -> None:
+def _load_cache(path=_CACHE_PATH) -> dict:
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def _save_cache(c: dict, path=_CACHE_PATH) -> None:
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _CACHE_PATH.write_text(json.dumps(c, indent=0))
+    path.write_text(json.dumps(c, indent=0))
 
 
 def make_diagnose_fn(buyers: pd.DataFrame, use_ollama: bool = True):
@@ -282,6 +283,84 @@ def draft_justification(facts: dict) -> str:
     )
     out = _ollama(prompt, timeout=12.0)
     return out or template
+
+
+# --------------------------------------------------------------------------- #
+# the buyer-facing email
+# --------------------------------------------------------------------------- #
+
+# stage -> the intent that drives tone + the ask
+_STAGE_INTENT = {
+    0: "a courtesy reminder ahead of the due date",
+    1: "a polite first follow-up now that the due date has passed",
+    2: "a firm reminder; escalate to the AP lead",
+    3: "an early-settlement offer",
+    4: "propose a short payment plan",
+}
+
+
+def _email_template(facts: dict) -> str:
+    """Deterministic fallback body (used when Ollama is unreachable)."""
+    ap = facts.get("ap_first") or "there"
+    stretch3 = (f"It is {facts['dbt']} days past terms again - please confirm payment today, "
+                f"or we will escalate to your AP lead.")
+    ask = {
+        0: f"This is a reminder that it falls due on {facts['due_date']}.",
+        1: f"It is now {facts['dbt']} days past the {facts['due_date']} due date - could you confirm a payment date?",
+        2: f"It is {facts['dbt']} days beyond the Net {facts['terms']} terms. We are escalating this to your AP lead and would appreciate an update today.",
+        3: facts.get("discount_line") or (stretch3 if facts.get("diagnosis") == "stretch"
+            else f"It is {facts['dbt']} days overdue; we can offer an early-settlement discount if it is cleared this week."),
+        4: f"It is {facts['dbt']} days overdue. We would like to agree a short payment plan - happy to set one up on a call.",
+    }.get(facts["stage"], f"It is {facts['dbt']} days beyond terms.")
+    lines = [
+        f"Hi {ap},",
+        "",
+        f"Invoice {facts['invoice_id']} for {facts['amount_inr']} (Net {facts['terms']}, "
+        f"due {facts['due_date']}). {ask}",
+    ]
+    if facts.get("pay_url"):
+        lines += ["", f"Pay here: {facts['pay_url']}"]
+    lines += ["", f"{facts['signatory']}", facts["sme_name"]]
+    return "\n".join(lines)
+
+
+def compose_email(facts: dict) -> str:
+    """Personalised buyer email. LLM writes it from `facts`; template on fallback."""
+    intent = _STAGE_INTENT.get(facts["stage"], "a reminder")
+    if facts["stage"] == 3 and facts.get("diagnosis") == "stretch":
+        intent = "a firm notice that the invoice is past terms again; ask for payment today or escalate"
+    prompt = (
+        "You write short, professional accounts-receivable emails for a supplier chasing "
+        "a late B2B invoice. Write ONLY the email body, at most 110 words.\n"
+        f"- Address the buyer contact by first name ({facts.get('ap_first') or 'the AP contact'}).\n"
+        f"- State the invoice number, amount, terms and due date exactly as given.\n"
+        f"- Tone and ask must match this intent: {intent}.\n"
+        "- The internal diagnosis below guides WHAT to say; never name it or mention any "
+        "internal analysis, model, score, or negotiation brief.\n"
+        "- Keep every number and the payment URL verbatim. Invent nothing.\n"
+        f"- Sign off as: {facts['signatory']}, {facts['sme_name']}.\n"
+        "Facts: " + json.dumps({k: v for k, v in facts.items() if k != "sme_name"})
+    )
+    out = _ollama(prompt, timeout=15.0)
+    if out and facts["invoice_id"] in out and (not facts.get("pay_url") or facts["pay_url"] in out):
+        return out
+    return _email_template(facts)
+
+
+def make_compose_fn(use_ollama: bool = True):
+    """Closure the engine calls per touch. Caches by (invoice_id, stage); temp 0."""
+    cache = _load_cache(_EMAIL_CACHE_PATH)
+
+    def compose(facts: dict) -> str:
+        key = f"{facts['invoice_id']}:{facts['stage']}"
+        if key in cache:
+            return cache[key]
+        body = compose_email(facts) if use_ollama else _email_template(facts)
+        cache[key] = body
+        return body
+
+    compose.flush = lambda: _save_cache(cache, _EMAIL_CACHE_PATH)
+    return compose
 
 
 if __name__ == "__main__":
