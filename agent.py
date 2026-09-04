@@ -26,6 +26,7 @@ import datetime as dt
 import json
 import os
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
@@ -38,6 +39,13 @@ from sklearn.pipeline import make_pipeline
 import config
 
 HOLDOUT_WEEKS = 6
+
+# Committed model artifacts. Trained by models/model1.ipynb / models/Model2.ipynb;
+# load_or_train_models() re-fits with the identical recipe when they are absent or
+# unloadable (e.g. a scikit-learn version skew on the pickle).
+MODELS_DIR = config.ROOT / "models"
+M1_PATH = MODELS_DIR / "model1_logistic_regression.joblib"
+M2_PATH = MODELS_DIR / "model2.joblib"
 _LABELS = ("cashflow", "process", "dispute", "stretch")
 _CACHE_PATH = config.DATA_DIR / "diagnosis_cache.json"
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -75,55 +83,97 @@ def _features(inv: pd.DataFrame, buyers: pd.DataFrame) -> pd.DataFrame:
     return f
 
 
-def train_risk_model(ledger: dict[str, pd.DataFrame]):
-    """Model 1 - classifier for P(invoice paid beyond terms)."""
+# --- Model 1: late-payment classifier -------------------------------------- #
+# Recipe from models/model1.ipynb: StandardScaler -> LogisticRegression, the 7
+# features in _features(), target `natural_dbt > 0`, 6-week time split.
+
+def _eval_clf(model, ledger: dict[str, pd.DataFrame]) -> dict:
     train, test = train_test_split_by_date(ledger)
     buyers = ledger["buyers"]
-    Xtr, ytr = _features(train, buyers), (train.natural_dbt > 0).astype(int)
     Xte, yte = _features(test, buyers), (test.natural_dbt > 0).astype(int)
-
-    model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
-    model.fit(Xtr, ytr)
-
     proba = model.predict_proba(Xte)[:, 1]
     pred = (proba >= 0.5).astype(int)
     prec, rec, f1, _ = precision_recall_fscore_support(yte, pred, average="binary", zero_division=0)
-    metrics = {
+    return {
         "n_train": int(len(train)), "n_test": int(len(test)),
         "auc": round(float(roc_auc_score(yte, proba)), 3) if yte.nunique() > 1 else None,
         "precision": round(float(prec), 3), "recall": round(float(rec), 3),
         "f1": round(float(f1), 3),
         "note": "synthetic data - the model partly recovers its own generator",
     }
-    return model, metrics
 
 
-def train_delay_model(ledger: dict[str, pd.DataFrame]):
-    """Model 2 - regressor for expected days beyond terms.
+def train_risk_model(ledger: dict[str, pd.DataFrame]):
+    """Model 1 - classifier for P(invoice paid beyond terms)."""
+    train, _ = train_test_split_by_date(ledger)
+    buyers = ledger["buyers"]
+    Xtr, ytr = _features(train, buyers), (train.natural_dbt > 0).astype(int)
+    model = make_pipeline(StandardScaler(),
+                          LogisticRegression(random_state=config.SEED, max_iter=1000))
+    model.fit(Xtr, ytr)
+    return model, _eval_clf(model, ledger)
 
-    Trained ONLY on invoices that were actually late (natural_dbt > 0). Forcing a
-    single regression to also fit the on-time zeros makes it a bad zero-inflated
-    fit; the late-only subset gives a cleaner magnitude estimate.
-    """
+
+# --- Model 2: expected-delay regressor ----------------------------------------- #
+# Recipe from models/Model2.ipynb: GradientBoostingRegressor(n_estimators=100,
+# learning_rate=0.03, max_depth=2) - no scaler (trees don't need one). Trained
+# ONLY on invoices that were actually late (natural_dbt > 0): forcing one
+# regression to also fit the on-time zeros is a poor zero-inflated fit.
+
+def _eval_reg(model, ledger: dict[str, pd.DataFrame]) -> dict:
     train, test = train_test_split_by_date(ledger)
     buyers = ledger["buyers"]
     tr, te = train[train.natural_dbt > 0], test[test.natural_dbt > 0]
-    Xtr, ytr = _features(tr, buyers), tr.natural_dbt.astype(float)
     Xte, yte = _features(te, buyers), te.natural_dbt.astype(float)
-
-    model = make_pipeline(StandardScaler(),
-                          GradientBoostingRegressor(random_state=config.SEED))
-    model.fit(Xtr, ytr)
-
     pred = model.predict(Xte)
-    baseline = np.full(len(yte), ytr.mean())
-    metrics = {
+    baseline = np.full(len(yte), tr.natural_dbt.astype(float).mean())
+    return {
         "n_train_late": int(len(tr)), "n_test_late": int(len(te)),
         "mae_days": round(float(mean_absolute_error(yte, pred)), 1) if len(te) else None,
         "baseline_mae_days": round(float(mean_absolute_error(yte, baseline)), 1) if len(te) else None,
         "note": "synthetic data - the model partly recovers its own generator",
     }
-    return model, metrics
+
+
+def train_delay_model(ledger: dict[str, pd.DataFrame]):
+    train, _ = train_test_split_by_date(ledger)
+    buyers = ledger["buyers"]
+    tr = train[train.natural_dbt > 0]
+    Xtr, ytr = _features(tr, buyers), tr.natural_dbt.astype(float)
+    model = GradientBoostingRegressor(n_estimators=100, learning_rate=0.03,
+                                      max_depth=2, random_state=config.SEED)
+    model.fit(Xtr, ytr)
+    return model, _eval_reg(model, ledger)
+
+
+# --- load the committed artifacts, or re-fit with the same recipe ------------- #
+
+def load_or_train_models(ledger: dict[str, pd.DataFrame], *, retrain: bool = False):
+    """Return (clf, reg, m1_metrics, m2_metrics).
+
+    Loads models/model1_logistic_regression.joblib + models/model2.joblib when
+    present and loadable; otherwise (or with retrain=True) re-fits both with the
+    notebook recipe and writes fresh artifacts back to models/. Metrics are
+    always recomputed against this ledger's 6-week holdout so the number on the
+    dashboard reflects the model actually in use.
+    """
+    if not retrain and M1_PATH.exists() and M2_PATH.exists():
+        try:
+            clf, reg = joblib.load(M1_PATH), joblib.load(M2_PATH)
+            m1, m2 = _eval_clf(clf, ledger), _eval_reg(reg, ledger)
+            m1["source"] = f"loaded {M1_PATH.name}"
+            m2["source"] = f"loaded {M2_PATH.name}"
+            return clf, reg, m1, m2
+        except Exception as exc:                       # noqa: BLE001
+            print(f"[agent] could not load committed models ({exc!r}); re-fitting from recipe")
+
+    clf, m1 = train_risk_model(ledger)
+    reg, m2 = train_delay_model(ledger)
+    MODELS_DIR.mkdir(exist_ok=True)
+    joblib.dump(clf, M1_PATH)
+    joblib.dump(reg, M2_PATH)
+    m1["source"] = m2["source"] = "re-fitted from notebook recipe"
+    return clf, reg, m1, m2
 
 
 def _row_features(state, b: pd.DataFrame, med_amt: dict[str, float] | None = None) -> pd.DataFrame:
@@ -367,7 +417,6 @@ if __name__ == "__main__":
     import ledger
 
     L = ledger.generate_ledger()
-    _, m1 = train_risk_model(L)
-    _, m2 = train_delay_model(L)
+    _, _, m1, m2 = load_or_train_models(L, retrain="--retrain" in __import__("sys").argv)
     print("Model 1 (late classifier):", m1)
     print("Model 2 (delay regressor):", m2)
