@@ -28,7 +28,7 @@ leverage.
 | Tests | **35 pytest tests**, green (`python -m pytest -q`) |
 | Dashboard | `uvicorn api:app` + `web/` (Vite + React) on the demo path |
 | Live Razorpay | one real test-mode payment link proven (`plink_…`), wired as `run.py --live-link INV-2032` |
-| Companion docs | `README.md` (setup/run), `MODEL_TRAINING.md` (the two models), `RAZORPAY_API.md` (APIs) |
+| Companion docs | `README.md` · `DATA_MODEL.md` · `MODEL_TRAINING.md` · `RAZORPAY_API.md` |
 
 **Latest run (`SEED=42`, `--no-llm`):**
 253 invoices · 20 buyers · paid 213 · escalated 33 · unresolved 7 · exceptions 29 ·
@@ -414,5 +414,5 @@ the synthetic build, add the buyer-mean baseline to the metrics, record the vide
 
 ---
 
-*Companion docs: `README.md` · `MODEL_TRAINING.md` · `RAZORPAY_API.md`
+*Companion docs: `README.md` · `DATA_MODEL.md` · `MODEL_TRAINING.md` · `RAZORPAY_API.md`
 Full design record: `~/.gstack/projects/Recoverly/shyamsundar-unknown-design-20260827-231916.md`*
