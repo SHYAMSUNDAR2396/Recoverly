@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recoverly — a receivables leverage agent for SMEs</title>
+<meta name="description" content="A bounded, fully-audited collections loop over every open invoice — turned into a buyer-specific negotiating position. Razorpay AI Buildathon 2026, Track 03.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#021331; --navy-2:#0A1D3D; --navy-bd:#1E3358; --navy-btn-bd:#2A3F63;
+    --blue:#1364F1; --blue-dk:#0E54CD; --blue-faint-bg:#F5F8FF; --blue-faint-bd:#D6E5FF;
+    --paper:#F7F7F7; --card:#FFFFFF; --bd:#DEE1E3; --bd-2:#C8CDD0;
+    --ink:#191D1F; --ink-2:#4B5358; --mute:#7B878E; --faint:#96A0A6;
+    --navy-sub:#8FA5C4; --navy-accent:#A8C8FF; --navy-text:#C4D0E4;
+    --green:#00753B; --red:#AA180E;
+    --cider-bg:#FFF3E9; --cider-bd:#FFD9BF; --cider-fg:#7A3E12; --cider-icon:#C5480A;
+    --mark-h:#3AA670; --mark-b:#C58E73;
+    --mono:"Menlo","SF Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--card);color:var(--ink);
+    font-family:"Inter",system-ui,-apple-system,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+  }
+  h1,h2,h3,p{margin:0}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{color:var(--blue-dk)}
+  code{font-family:var(--mono)}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:0 40px}
+  section{padding:80px 0}
+  .section-paper{background:var(--paper)}
+  .section-navy{background:var(--navy);color:#fff}
+  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+  h2{font-size:30px;font-weight:700;letter-spacing:-.015em;text-wrap:pretty}
+  .lede{font-size:15px;line-height:1.7;color:var(--ink-2)}
+
+  .btn{display:inline-block;font-size:15px;font-weight:600;padding:13px 22px;border-radius:8px;
+    border:1px solid transparent;transition:background .15s,border-color .15s,color .15s}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{background:var(--blue-dk);color:#fff}
+  .btn-ghost{border-color:var(--bd-2);color:var(--ink-2)}
+  .btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+  .btn-ghost-navy{border-color:var(--navy-btn-bd);color:var(--navy-text)}
+  .btn-ghost-navy:hover{border-color:var(--navy-accent);color:#fff}
+
+  .card{border:1px solid var(--bd);border-radius:12px;background:var(--card)}
+  .card-navy{border:1px solid var(--navy-bd);border-radius:12px;background:var(--navy-2)}
+  .grid{display:grid;gap:20px}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g2b{grid-template-columns:.9fr 1.1fr}
+
+  /* top bar */
+  header{border-bottom:1px solid var(--bd);position:sticky;top:0;background:rgba(255,255,255,.92);
+    backdrop-filter:saturate(150%) blur(6px);z-index:20}
+  .bar{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
+  .brand{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  nav{display:flex;align-items:center;gap:32px;font-size:14px}
+  nav a.navlink{color:var(--mute)}
+  nav a.navlink:hover{color:var(--ink)}
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center}
+  .hero h1{font-size:46px;line-height:1.15;font-weight:700;letter-spacing:-.02em;margin-top:18px;text-wrap:pretty}
+  .hero .lede{font-size:17px;margin-top:20px;max-width:560px}
+  .cta-row{display:flex;gap:14px;margin-top:32px;flex-wrap:wrap}
+  .fineprint{font-size:13px;color:var(--faint);margin-top:18px}
+
+  /* leverage brief mock */
+  .brief{border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--card);
+    box-shadow:0 12px 28px rgba(0,0,0,.07)}
+  .brief-hd{background:var(--navy);padding:20px 24px}
+  .brief-kicker{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--navy-accent)}
+  .brief-buyer{font-size:19px;font-weight:600;color:#fff;margin-top:8px}
+  .brief-sub{font-size:12px;color:var(--navy-sub);margin-top:4px}
+  .brief-bd{padding:22px 24px}
+  .minicap{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+  .marks{display:flex;margin-top:10px}
+  .marks span{height:18px;display:block}
+  .marks .h{width:108px;background:repeating-linear-gradient(90deg,var(--mark-h) 0 9px,#fff 9px 12px)}
+  .marks .b{width:216px;background:repeating-linear-gradient(90deg,var(--mark-b) 0 9px,#fff 9px 12px)}
+  .stat-lg{font-size:20px;font-weight:600}
+  .callout{border:1px solid var(--blue-faint-bd);background:var(--blue-faint-bg);border-radius:8px;padding:14px 16px;margin-top:18px}
+  .callout .minicap{color:var(--blue-dk)}
+  .callout p{font-size:14px;line-height:1.55;color:var(--navy);margin-top:6px;font-weight:500}
+
+  /* problem tiles */
+  .tile-num{font-size:22px;font-weight:700;color:var(--red)}
+  .tile p{font-size:14px;line-height:1.6;color:var(--ink-2);margin-top:10px}
+  .source{font-size:14px;color:var(--mute);margin-top:28px}
+  .source strong{color:var(--ink)}
+
+  /* idea */
+  .act-kicker{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--navy-sub)}
+  .act-h{font-size:17px;font-weight:600;margin-top:10px}
+  .act p{font-size:14px;line-height:1.65;color:var(--navy-text);margin-top:10px}
+  .idea h2{line-height:1.25;max-width:760px}
+  .idea .accent{color:var(--navy-accent)}
+
+  /* how it works */
+  .step{padding:26px}
+  .step-top{display:flex;align-items:center;gap:12px}
+  .step svg{color:var(--blue)}
+  .step-n{font-size:12px;font-weight:600;color:var(--mute)}
+  .step-h{font-size:17px;font-weight:600;margin-top:14px}
+  .step p{font-size:14px;line-height:1.65;color:var(--ink-2);margin-top:8px}
+  .chips{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}
+  .chip{border:1px solid var(--bd);border-radius:9999px;padding:8px 16px;font-size:13px;font-weight:500;color:var(--ink-2)}
+
+  /* numbers */
+  .fig{padding:22px}
+  .fig .minicap{color:var(--mute);letter-spacing:0;text-transform:none;font-weight:400;font-size:11px}
+  .fig-v{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-top:8px}
+  .fig-v .u{font-size:15px;color:var(--mute);font-weight:600}
+  .fig-sub{font-size:12px;color:var(--mute);margin-top:4px}
+  .note{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--cider-bd);background:var(--cider-bg);
+    border-radius:10px;padding:18px 20px;margin-top:24px;max-width:940px}
+  .note svg{flex-shrink:0;margin-top:1px;color:var(--cider-icon)}
+  .note p{font-size:13.5px;line-height:1.65;color:var(--cider-fg)}
+
+  /* razorpay + tech */
+  .rz-h{font-size:17px;font-weight:600}
+  .rz p{font-size:14px;line-height:1.65;color:var(--navy-text);margin-top:10px}
+  .rz code{color:var(--navy-accent)}
+  .techchips{display:flex;gap:10px;flex-wrap:wrap}
+  .techchips .chip{background:var(--paper)}
+  .tech-line{font-size:13px;color:var(--faint);margin-top:18px}
+
+  /* footer */
+  .foot-cta{display:flex;justify-content:space-between;align-items:center;gap:40px;flex-wrap:wrap}
+  .foot-cta p{font-size:14px;color:var(--navy-sub);margin-top:8px}
+  .foot-meta{border-top:1px solid var(--navy-bd);margin-top:44px;padding-top:20px;display:flex;
+    justify-content:space-between;align-items:center;font-size:12px;color:var(--navy-sub);flex-wrap:wrap;gap:12px}
+  .foot-meta .mono{font-family:var(--mono)}
+
+  @media (max-width:860px){
+    .wrap{padding:0 20px}
+    section{padding:48px 0}
+    nav{display:none}
+    h2{font-size:23px}
+    .hero{grid-template-columns:1fr;gap:36px}
+    .hero h1{font-size:29px}
+    .hero .lede{font-size:16px}
+    .g2,.g2b,.g3,.g4{grid-template-columns:1fr}
+    .g4.figs{grid-template-columns:1fr 1fr}
+    .brief{box-shadow:none}
+    .btn{display:block;text-align:center}
+    .cta-row .btn{flex:1}
+    .foot-cta .btn{flex:1}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="#top">
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="#1364F1"></rect>
+        <path d="M7 17.5 L11.5 6.5 L15 6.5 L10.5 17.5 Z" fill="#FFFFFF"></path>
+        <path d="M12.5 12.5 L17 12.5 L14.5 17.5 L11 17.5 Z" fill="#A8C8FF"></path>
+      </svg>
+      Recoverly
+    </a>
+    <nav>
+      <a class="navlink" href="#how">How it works</a>
+      <a class="navlink" href="#brief">The brief</a>
+      <a class="navlink" href="#numbers">Honest numbers</a>
+      <a class="navlink" href="[REPO URL]">Repo</a>
+      <a class="btn btn-primary" href="[VIDEO URL]" style="padding:9px 16px">Watch the 5-min demo</a>
+    </nav>
+  </div>
+</header>
+
+<span id="top"></span>
+
+<!-- HERO -->
+<section class="section-paper" style="border-bottom:1px solid var(--bd)">
+  <div class="wrap hero">
+    <div>
+      <div class="eyebrow">Razorpay AI Buildathon 2026 &nbsp;·&nbsp; Track 03 — AI Revenue Recovery</div>
+      <h1>Your large buyers pay late because they can. Recoverly gives you the leverage to change that.</h1>
+      <p class="lede">A bounded, fully-audited collections loop runs over every open invoice — then turns
+        what it learns into a buyer-specific negotiating position you can take into a room.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="[VIDEO URL]">Watch the 5-min demo</a>
+        <a class="btn btn-ghost" href="[REPO URL]">Read the code →</a>
+      </div>
+      <div class="fineprint">Runs offline on one laptop. One outbound call in the whole project.</div>
+    </div>
+
+    <div class="brief">
+      <div class="brief-hd">
+        <div class="brief-kicker">Terms-revision brief</div>
+        <div class="brief-buyer">Meridian Retail</div>
+        <div class="brief-sub">27 invoices · Net 60 throughout</div>
+      </div>
+      <div class="brief-bd">
+        <div class="minicap">Net 60 agreed — settlement record</div>
+        <div class="marks"><span class="h"></span><span class="b"></span></div>
+        <div style="font-size:12px;color:var(--ink-2);margin-top:9px">honored 9 &nbsp;·&nbsp; broken 18</div>
+        <div class="grid g2" style="gap:14px;margin-top:20px">
+          <div><div class="stat-lg">+17.4 d</div><div class="fig-sub">mean days beyond terms</div></div>
+          <div><div class="stat-lg">0.0%</div><div class="fig-sub">dispute rate</div></div>
+        </div>
+        <div class="callout">
+          <div class="minicap">Recommended terms</div>
+          <p>Move to Net 45 with a 1.5% early-settlement discount if paid by day 20.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section>
+  <div class="wrap">
+    <h2 style="max-width:620px">You've already delivered. They pay when they feel like it.</h2>
+    <div class="grid g3" style="margin-top:36px">
+      <div class="card tile" style="padding:24px">
+        <div class="tile-num">Net 60 → 84</div>
+        <p>The agreed term is only the start. Real settlement lands weeks later, every cycle.</p>
+      </div>
+      <div class="card tile" style="padding:24px">
+        <div class="tile-num">35%+ of revenue</div>
+        <p>One large buyer can be a third of the book — so the supplier never pushes back on terms.</p>
+      </div>
+      <div class="card tile" style="padding:24px">
+        <div class="tile-num">You borrow the gap</div>
+        <p>Goods shipped, suppliers and payroll paid — the SME finances the buyer's float on credit.</p>
+      </div>
+    </div>
+    <p class="source">Sourced from Razorpay's own Fix My Itch board — itch score <strong>82.8</strong>,
+      the highest-scored B2B Services problem on it.</p>
+  </div>
+</section>
+
+<!-- IDEA -->
+<section class="section-navy idea">
+  <div class="wrap">
+    <h2>Collections is not the product. It's the evidence engine.
+      <span class="accent">The leverage is the product.</span></h2>
+    <div class="grid g2 idea-grid" style="gap:28px;margin-top:40px">
+      <div class="card-navy" style="padding:26px">
+        <div class="act-kicker">Act one</div>
+        <div class="act-h">A bounded, audited loop runs over every open invoice</div>
+        <p class="act">Day by day: score the risk, pick the intervention by a deterministic rule, stay
+          inside hard bounds, hand anything terminal to a human. Every action is written down.</p>
+      </div>
+      <div class="card-navy" style="padding:26px">
+        <div class="act-kicker">Act two</div>
+        <div class="act-h">Its record becomes a negotiating position</div>
+        <p class="act">Honored vs broken terms, mean days beyond, promise-kept rate, dispute rate —
+          assembled into a one-page brief with recommended terms and the message to send.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEVERAGE BRIEF -->
+<section class="section-paper" id="brief">
+  <div class="wrap">
+    <div class="grid g2b" style="gap:56px;align-items:start">
+      <div>
+        <div class="eyebrow">The differentiator</div>
+        <h2 style="margin-top:14px">Walk in with their own payment record.</h2>
+        <p class="lede" style="margin-top:16px">For any buyer with 20+ invoices, Recoverly builds one
+          page: honored vs broken terms, mean days beyond terms and its spread, promise-kept rate,
+          dispute rate — then a <strong style="color:var(--ink)">recommended terms revision</strong>
+          and the exact message to send the AP lead.</p>
+        <p class="lede" style="margin-top:14px">The recommendation is a
+          <strong style="color:var(--ink)">deterministic rule</strong> over the honored-rate and mean
+          DBT. Only the justification paragraph is generative. Same split as the collections ladder:
+          fixed decision, generated language.</p>
+      </div>
+
+      <div class="brief" style="box-shadow:0 1px 2px rgba(2,19,49,.04)">
+        <div class="brief-hd" style="padding:24px 30px">
+          <div class="brief-kicker">Terms-revision brief · prepared for negotiation</div>
+          <div class="brief-buyer" style="font-size:22px">Harbour Textiles — dispute-window condition</div>
+          <div class="brief-sub">Net 30 agreed · honored 4 · broken 15 · mean +38d vs peer +9d</div>
+        </div>
+        <div class="brief-bd" style="padding:26px 30px">
+          <div class="grid g3" style="gap:14px">
+            <div style="background:var(--paper);border-radius:8px;padding:14px">
+              <div class="fig-sub">Mean days beyond terms</div><div style="font-size:22px;font-weight:600;margin-top:6px">+38 d</div></div>
+            <div style="background:var(--paper);border-radius:8px;padding:14px">
+              <div class="fig-sub">Promise-kept rate</div><div style="font-size:22px;font-weight:600;margin-top:6px">0.31</div></div>
+            <div style="background:var(--paper);border-radius:8px;padding:14px">
+              <div class="fig-sub">Dispute rate</div><div style="font-size:22px;font-weight:600;margin-top:6px">22%</div></div>
+          </div>
+          <p style="font-size:14px;line-height:1.7;margin-top:22px">Disputes cluster at day 25–30,
+            resolve within a week, and are followed by payment within 2 days — consistent with a
+            stall, not a quality problem.</p>
+          <div class="callout" style="padding:18px 20px">
+            <div class="minicap">Recommended terms</div>
+            <p style="font-size:15px;line-height:1.6">Add a terms condition: disputes must be raised
+              within 7 days of delivery to pause the clock. Disputes raised later are logged but
+              non-blocking.</p>
+          </div>
+          <div style="border:1px solid var(--bd);background:#FCFCFD;border-radius:8px;padding:16px 18px;margin-top:16px">
+            <div class="minicap" style="margin-bottom:8px">Message to the AP lead</div>
+            <div style="font-size:13px;line-height:1.7;white-space:pre-line">Hi Deepak,
+
+We would like to add one clause to our supply terms: any dispute on quantity or quality is raised within 7 days of delivery. This matches standard practice and helps both sides close invoices faster.
+
+Best,
+Ravi</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <div class="grid g2" style="gap:24px;margin-top:36px">
+      <div class="card step">
+        <div class="step-top">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          <span class="step-n">01</span>
+        </div>
+        <div class="step-h">Watch &amp; score</div>
+        <p>A two-model cascade: a classifier flags which invoices will slip, then a regressor estimates
+          by how many days — but only for the ones the classifier flagged. Informational only.</p>
+      </div>
+      <div class="card step">
+        <div class="step-top">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20h5V4"></path><path d="M9 12h5"></path><path d="M9 20h11"></path><path d="M14 12V8h6"></path></svg>
+          <span class="step-n">02</span>
+        </div>
+        <div class="step-h">Act on a deterministic ladder</div>
+        <p>Days-beyond-terms picks the rung — courtesy reminder → firm reminder → early-settlement
+          offer → payment plan → stop. A pure function. The LLM never chooses the action.</p>
+      </div>
+      <div class="card step">
+        <div class="step-top">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8 10h8"></path><path d="M8 13h5"></path></svg>
+          <span class="step-n">03</span>
+        </div>
+        <div class="step-h">Diagnose &amp; draft</div>
+        <p>A local model (Ollama — no API, no egress) labels why the invoice is slipping and writes the
+          buyer email in the right tone. Five hard bounds refuse over-reach and escalate.</p>
+      </div>
+      <div class="card step">
+        <div class="step-top">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
+          <span class="step-n">04</span>
+        </div>
+        <div class="step-h">Hand you the brief</div>
+        <p>Plus an append-only audit trail — pick any action and trace exactly why it happened: the
+          risk score, the diagnosis, the rung, the bounds it passed, the message.</p>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip">Deterministic ladder, generative language</span>
+      <span class="chip">Five hard bounds, defined once</span>
+      <span class="chip">Every action audited</span>
+    </div>
+  </div>
+</section>
+
+<!-- HONEST NUMBERS -->
+<section class="section-paper" id="numbers">
+  <div class="wrap">
+    <h2 style="max-width:640px">We tell you what's modeled and what's measured.</h2>
+    <div class="grid g4 figs" style="margin-top:36px">
+      <div class="card fig">
+        <div class="minicap">Invoices, 70 / 30 split</div>
+        <div class="fig-v">253</div>
+        <div class="fig-sub">treatment vs untouched control</div>
+      </div>
+      <div class="card fig">
+        <div class="minicap">DSO reduction</div>
+        <div class="fig-v" style="color:var(--green)">−3.1 d</div>
+        <div class="fig-sub">control minus treatment</div>
+      </div>
+      <div class="card fig">
+        <div class="minicap">Model 1 — classifier</div>
+        <div class="fig-v">0.87 <span class="u">AUC</span></div>
+        <div class="fig-sub">6-week holdout</div>
+      </div>
+      <div class="card fig">
+        <div class="minicap">Model 2 — delay regressor</div>
+        <div class="fig-v">6.5 d <span class="u">MAE</span></div>
+        <div class="fig-sub">vs 7.0 d mean baseline</div>
+      </div>
+    </div>
+    <div class="note">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+      <p>The treatment effect exists because of an authored, benchmark-anchored response assumption
+        (<code>RESPONSE_LIFT</code>), shown on screen and named as an assumption. The control group
+        proves the measurement machinery is sound — <strong>not</strong> that the agent works. The
+        data is synthetic, so the models partly recover their own generator; the claim is the
+        pipeline, not the score.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BUILT ON RAZORPAY -->
+<section class="section-navy">
+  <div class="wrap rz">
+    <h2>One real call. Everything else is yours to keep.</h2>
+    <div class="grid g2 rz-grid" style="gap:28px;margin-top:36px">
+      <div class="card-navy" style="padding:26px">
+        <div class="rz-h">A live test-mode Payment Link, on camera</div>
+        <p>The batch is simulated for a reproducible demo. One invoice creates a real Razorpay
+          test-mode link carrying <code>customer</code> and <code>notify</code> — so Razorpay texts
+          the buyer and auto-reminds until it's paid.</p>
+      </div>
+      <div class="card-navy" style="padding:26px">
+        <div class="rz-h">It reads the data you already generate</div>
+        <p>An SME already running collections on Razorpay has every invoice, every payment date, every
+          buyer. Recoverly turns that into leverage — no new integration, no manual data entry.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STRIP -->
+<section style="padding:56px 0;border-bottom:1px solid var(--bd)">
+  <div class="wrap">
+    <div class="techchips">
+      <span class="chip">Python</span>
+      <span class="chip">pandas</span>
+      <span class="chip">DuckDB</span>
+      <span class="chip">scikit-learn</span>
+      <span class="chip">Ollama — local, no external LLM</span>
+      <span class="chip">FastAPI</span>
+      <span class="chip">React</span>
+      <span class="chip">pytest — 35 green</span>
+    </div>
+    <p class="tech-line">Runs offline on one laptop. The only outbound call is the one Razorpay link.</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<section class="section-navy" style="padding:72px 0">
+  <div class="wrap">
+    <div class="foot-cta">
+      <div>
+        <h2 style="font-size:28px">See it run.</h2>
+        <p>Five minutes: one invoice, the ladder, the real link, the brief.</p>
+      </div>
+      <div class="cta-row" style="margin-top:0">
+        <a class="btn btn-primary" href="[VIDEO URL]">Watch the 5-min demo</a>
+        <a class="btn btn-ghost-navy" href="[REPO URL]">Repo →</a>
+      </div>
+    </div>
+    <div class="foot-meta">
+      <span>Recoverly · Razorpay AI Buildathon 2026 · Track 03 · [YOUR NAME]</span>
+      <span class="mono">deterministic ladder · generative language</span>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

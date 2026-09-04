@@ -16,6 +16,23 @@
           "web/src/App.jsx"
         ],
         "createdAt": "2026-08-31T16:13:56.070Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "*",
+        "files": [
+          "landing/Main.dc.html",
+          "landing/Mobile.dc.html"
+        ],
+        "createdAt": "2026-09-04T10:54:59.667Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "*",
+        "files": [
+          "landing/index.html"
+        ],
+        "createdAt": "2026-09-04T10:59:33.916Z"
       }
     ]
   }

@@ -46,6 +46,7 @@ never blocks on it — `diagnose()` falls back to a rule-based classifier and
 | `api.py` | FastAPI, read-only `GET`. `/invoices` `/metrics` `/audit` `/exceptions` `/buyers` `/buyers/{id}/brief`. |
 | `test_engine.py` | 26 tests: the 3 silent-failure gaps, every `BOUNDS` predicate, the ladder boundaries, the 4 demo beats, determinism. |
 | `web/` | Vite + React SPA (not built yet). |
+| `landing/index.html` | Standalone landing page — one self-contained file, no build, Razorpay Blade look. Fill `[REPO URL]` / `[VIDEO URL]` / `[YOUR NAME]`. Open the file or `python3 -m http.server --directory landing`. (`landing/*.dc.html` are the design-canvas source.) |
 
 ## On the numbers
 
