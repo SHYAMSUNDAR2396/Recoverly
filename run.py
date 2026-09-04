@@ -1,8 +1,9 @@
 """Orchestrator: ledger -> risk model -> engine -> metrics -> results.duckdb.
 
-    ./.venv/bin/python run.py                    # normal run
+    ./.venv/bin/python run.py                    # normal run (loads models/ artifacts)
     ./.venv/bin/python run.py --no-llm           # skip Ollama, rule-based diagnosis only
     ./.venv/bin/python run.py --fresh            # regenerate the committed ledger
+    ./.venv/bin/python run.py --retrain          # re-fit Model 1 + Model 2, rewrite models/
     ./.venv/bin/python run.py --live-link INV-2032   # ONE real Razorpay test-mode link
                                                      # (needs RAZORPAY_KEY_ID / _SECRET env,
                                                      #  invoice amount < ₹5,00,000)
@@ -41,8 +42,7 @@ def main(argv: list[str]) -> None:
     print(f"ledger: {len(L['invoices'])} invoices, {len(L['buyers'])} buyers, "
           f"{len(L['events'])} events")
 
-    clf, m1 = agent.train_risk_model(L)
-    reg, m2 = agent.train_delay_model(L)
+    clf, reg, m1, m2 = agent.load_or_train_models(L, retrain="--retrain" in argv)
     print("Model 1 (late classifier):", m1)
     print("Model 2 (delay regressor):", m2)
 

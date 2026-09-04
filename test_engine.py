@@ -145,6 +145,15 @@ def test_delay_model_trains_on_late_only(L):
     assert m2["mae_days"] <= m2["baseline_mae_days"] + 1e-9  # beats predicting the mean
 
 
+def test_load_or_train_models_yields_usable_cascade(L):
+    agent = pytest.importorskip("agent")
+    clf, reg, m1, m2 = agent.load_or_train_models(L)        # loads models/ or re-fits
+    assert hasattr(clf, "predict_proba") and hasattr(reg, "predict")
+    assert {"auc", "source"} <= set(m1) and {"mae_days", "source"} <= set(m2)
+    hi = agent.make_risk_fn(clf, reg, L["buyers"], invoices=L["invoices"])(_state())
+    assert 0.0 <= hi["p_late"] <= 1.0
+
+
 # --------------------------------------------------------------------------- #
 # CRITICAL GAP 3 - promise_kept_rate with zero promises is NULL, not 0.0
 # --------------------------------------------------------------------------- #

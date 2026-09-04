@@ -25,14 +25,14 @@ leverage.
 | | |
 |---|---|
 | Pipeline | `python run.py --no-llm` completes end to end and writes `results.duckdb` |
-| Tests | **35 pytest tests**, green (`python -m pytest -q`) |
+| Tests | **36 pytest tests**, green (`python -m pytest -q`) |
 | Dashboard | `uvicorn api:app` + `web/` (Vite + React) on the demo path |
 | Live Razorpay | one real test-mode payment link proven (`plink_…`), wired as `run.py --live-link INV-2032` |
 | Companion docs | `README.md` · `DATA_MODEL.md` · `MODEL_TRAINING.md` · `RAZORPAY_API.md` |
 
 **Latest run (`SEED=42`, `--no-llm`):**
 253 invoices · 20 buyers · paid 213 · escalated 33 · unresolved 7 · exceptions 29 ·
-DSO −3.1 days · Model 1 AUC 0.869 · Model 2 MAE 6.5d vs 7.0d baseline ·
+DSO −3.1 days · Model 1 AUC 0.869 · Model 2 MAE 5.6d vs 7.0d baseline ·
 net benefit ≈ −₹5k (see feature 10).
 
 ---
@@ -287,7 +287,8 @@ Same split as the ladder: deterministic recommendation, generative language.
 | `config.py` | Every constant: `SEED`, `LADDER`, `BOUNDS` limits, `RISK_THRESHOLD`, `RESPONSE_LIFT`, `EARLY_SETTLEMENT_DISCOUNT`, thresholds, paths |
 | `ledger.py` | Synthetic generator · buyer behavioral profiles · dated event stream · seeded, generated once, committed as parquet under `data/ledger/` |
 | `engine.py` | Day loop · event application · deterministic ladder · `BOUNDS` · split stop conditions · promise feedback loop · audit writes · `live_link_invoice` hook |
-| `agent.py` | **Model 1** `train_risk_model` · **Model 2** `train_delay_model` (late-only) · `make_risk_fn` cascade closure · `diagnose()` rule-based + optional Ollama · `draft_justification()` |
+| `agent.py` | **Model 1** `train_risk_model` · **Model 2** `train_delay_model` (late-only) · `load_or_train_models` (loads `models/*.joblib`, re-fits on miss) · `make_risk_fn` cascade closure · `diagnose()` rule-based + optional Ollama · `draft_justification()` · `compose_email()` |
+| `models/` | Committed artifacts `model1_logistic_regression.joblib` + `model2.joblib` and the notebooks (`model1.ipynb` / `Model2.ipynb`) that trained them. `run.py` loads them; `--retrain` regenerates |
 | `brief.py` | Per-buyer leverage brief — deterministic recommended terms, generative justification, `None`-safe `promise_kept_rate` |
 | `razorpay_link.py` | Link adapter with a `live` flag — simulated batch, one real test-mode call, `customer`/`notify`/`reminders`, cache + graceful fallback (named `_link` so it does not shadow the `razorpay` SDK) |
 | `notify.py` | Dry-run mailer (mirrors `razorpay_link.py`) — records the email on the audit row; `live=True` is a guarded stub; recipients are `.example` |
@@ -295,7 +296,7 @@ Same split as the ladder: deterministic recommendation, generative language.
 | `run.py` | Orchestrator → `results.duckdb`. Flags: `--no-llm`, `--fresh`, `--live-link INV-XXXX` |
 | `api.py` | FastAPI — read-only `GET` over `results.duckdb`. No writes, no auth, no webhook |
 | `web/` | Vite + React SPA — three views, fetches from `api.py`. Razorpay Blade palette, ~1 component file, no Redux, no router |
-| `test_engine.py` | **35 pytest tests** — the three silent-failure gaps, every `BOUNDS` predicate via `parametrize`, the ladder boundaries, the risk cascade gate, the buyer-email rules, the demo beats, determinism |
+| `test_engine.py` | **36 pytest tests** — the three silent-failure gaps, every `BOUNDS` predicate via `parametrize`, the ladder boundaries, the risk cascade gate, the buyer-email rules, the demo beats, determinism |
 
 ### Key design rules
 
@@ -327,7 +328,7 @@ Same split as the ladder: deterministic recommendation, generative language.
 | 2 | `engine.py` + `test_engine.py` | Day loop, ladder, `BOUNDS`, split stop conditions, promise loop, audit. Tests alongside. |
 | 3 | `brief.py` | The differentiator, built before the models and the LLM so it can't be the thing cut. |
 | 4 | `razorpay_link.py` | The `live` flag; one real test-mode link end to end. |
-| 5 | `agent.py` — Model 1 + Model 2 | `train_risk_model` (logistic, 6-week holdout), then `train_delay_model` (GBR, late-only, gated). `make_risk_fn` wires the cascade. |
+| 5 | `agent.py` — Model 1 + Model 2 | `train_risk_model` (logistic, 6-week holdout), then `train_delay_model` (GBR `lr=0.03/depth=2`, late-only, gated). Recipes match `models/*.ipynb`; `load_or_train_models` loads the committed `.joblib`s. `make_risk_fn` wires the cascade. |
 | 6 | `agent.py` — `diagnose()` | Rule-based path first, then optional Ollama (`llama3.1:8b`, `temp 0`, cached). |
 | 7 | `metrics.py` | Treatment/control split, cash pulled forward, net benefit, exception list. |
 | 8 | `run.py` + `api.py` + `web/` | Orchestrator → `results.duckdb`; FastAPI read-only endpoints; Vite + React SPA, three views, Razorpay Blade palette. |
@@ -374,7 +375,8 @@ Same split as the ladder: deterministic recommendation, generative language.
 |---|---|
 | Data / ledger | Python + pandas + DuckDB (in-process); parquet |
 | ML — Model 1 | `sklearn` `LogisticRegression` (late / not-late) |
-| ML — Model 2 | `sklearn` `GradientBoostingRegressor` (expected days late, late-only) — `Ridge`/`PoissonRegressor` is the defensible alternative on synthetic data; GBR is the production choice on real data |
+| ML — Model 2 | `sklearn` `GradientBoostingRegressor(n_estimators=100, learning_rate=0.03, max_depth=2)` (expected days late, late-only) — tuned config from `models/Model2.ipynb`; MAE 5.6d vs 7.0d baseline |
+| ML — artifacts | `models/*.joblib`, loaded by `agent.load_or_train_models`; re-fit + rewritten on version-skew or `--retrain` |
 | Agent | Local LLM via **Ollama** (`llama3.1:8b`, `temp 0`) — diagnosis + drafting only, optional, rule-based fallback |
 | Payments | `razorpay` PyPI SDK, test-mode keys — the one and only external network call; link carries `customer` + `notify` |
 | Email | `notify.py` — dry-run mailer, `live=True` a guarded SES/SMTP stub; personalized body from `agent.compose_email` |
@@ -395,7 +397,7 @@ Razorpay APIs for a production version are catalogued in `RAZORPAY_API.md`.
 - Tamper-proof audit (append-only by convention + timestamp only)
 - Real payment settlement / webhook reconciliation (test-mode link proves connectivity, not settlement)
 - Hourly simulation clock (day granularity + assigned timestamps covers the bound)
-- Full test coverage (35 tests target silent-failure paths and the demo beats; ledger stats, brief formatting, React rendering untested by choice)
+- Full test coverage (36 tests target silent-failure paths and the demo beats; ledger stats, brief formatting, React rendering untested by choice)
 - Auth, write endpoints, or a webhook on `api.py` — read-only `GET` only
 - A hosted LLM — local via Ollama; the only external call is one Razorpay test-mode link
 - LLM fine-tuning — `llama3.1:8b` is used as-shipped; behavior is prompt + `temp 0` only
@@ -408,7 +410,7 @@ Razorpay APIs for a production version are catalogued in `RAZORPAY_API.md`.
 ## Resolved
 
 **Integration risk (previously open):** the pipeline is built and runs end to end;
-`run.py --no-llm` → `results.duckdb` → `api.py` → `web/` all work, 35 tests green. No
+`run.py --no-llm` → `results.duckdb` → `api.py` → `web/` all work, 36 tests green. No
 blocking integration issues surfaced. Remaining polish: swap Model 2 to `Ridge`/Poisson for
 the synthetic build, add the buyer-mean baseline to the metrics, record the video.
 

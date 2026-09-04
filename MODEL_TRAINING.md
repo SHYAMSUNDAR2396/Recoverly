@@ -13,8 +13,12 @@ used as-shipped.
 | Trained on | all invoices in the training window | **late invoices only** (`natural_dbt > 0`) |
 | Metric | AUC / precision / recall / F1 | MAE vs a mean-prediction baseline |
 
-Both are retrained on every `run.py` invocation (~2 s total). Nothing is
-persisted to disk unless you add it (step 6).
+`run.py` **loads the committed artifacts** in `models/`
+(`model1_logistic_regression.joblib`, `model2.joblib`) via
+`agent.load_or_train_models`. If they are missing or unloadable (a scikit-learn
+version skew on the pickle), it re-fits both with the same recipe and writes
+fresh artifacts back. `run.py --retrain` forces a re-fit. The recipe matches
+`models/model1.ipynb` / `models/Model2.ipynb`.
 
 ---
 
@@ -67,7 +71,8 @@ On the committed ledger: **167 train / 86 test**.
 `agent.train_risk_model(ledger)`:
 
 1. `X_train = _features(train)`, `y_train = (train.natural_dbt > 0)` — binary.
-2. Pipeline `StandardScaler → LogisticRegression(max_iter=1000)`, `.fit(...)`.
+2. Pipeline `StandardScaler → LogisticRegression(random_state=42, max_iter=1000)`
+   — the recipe from `models/model1.ipynb`.
 3. Predict probabilities on the test set, threshold at 0.5, compute
    **AUC / precision / recall / F1**.
 4. Returns `(model, metrics)`.
@@ -88,12 +93,14 @@ so on camera. The claim is the pipeline, not the AUC.
    the whole point of the two-model design: a single regression forced to also
    fit ~150 on-time zeros predicts magnitude badly (zero-inflated target).
 2. `X_train = _features(late_train)`, `y_train = late_train.natural_dbt`.
-3. Pipeline `StandardScaler → GradientBoostingRegressor(random_state=42)`, `.fit(...)`.
+3. `GradientBoostingRegressor(n_estimators=100, learning_rate=0.03, max_depth=2,
+   random_state=42)` — the tuned config from `models/Model2.ipynb`. No scaler;
+   trees do not need one.
 4. Predict on `late_test`; compute **MAE** and **baseline MAE** (predicting the
    training-set mean delay for everyone).
 5. Returns `(model, metrics)`.
 
-Expected: `mae_days ≈ 6.5` vs `baseline_mae_days ≈ 7.0` — it beats the naive
+Expected: `mae_days ≈ 5.6` vs `baseline_mae_days ≈ 7.0` — it beats the naive
 baseline. `test_engine.py::test_delay_model_trains_on_late_only` asserts both the
 late-only filter and that MAE ≤ baseline.
 
@@ -120,30 +127,31 @@ prompt, the severity label, and the dashboard.
 
 ---
 
-## 6. Train + use everything in one shot
+## 6. Load / use everything in one shot
 
 ```bash
-./.venv/bin/python agent.py            # trains both, prints metrics only
-./.venv/bin/python run.py --no-llm     # trains both, runs the sim, writes results.duckdb
+./.venv/bin/python agent.py              # load models/ (or re-fit), print metrics
+./.venv/bin/python run.py --no-llm       # load models/, run the sim, write results.duckdb
+./.venv/bin/python run.py --retrain      # force a re-fit and rewrite models/*.joblib
 ```
 
-`run.py` stores both models' metrics in `results.duckdb`
+`agent.load_or_train_models(ledger, retrain=…)`:
+
+1. If `models/model1_logistic_regression.joblib` and `models/model2.joblib` both
+   exist and load, use them. Metrics are **recomputed** against this ledger's
+   6-week holdout so the dashboard number reflects the model actually in use;
+   the metric dict carries `source: "loaded …"`.
+2. Otherwise (or `retrain=True`): `train_risk_model` + `train_delay_model`,
+   `joblib.dump` both back to `models/`, `source: "re-fitted from notebook recipe"`.
+
+The committed `.joblib` files were produced by the notebooks in `models/` on a
+different scikit-learn; they will not unpickle here, so the first run re-fits and
+replaces them with loadable equivalents. To wire your **own** exported artifacts
+instead, drop them at those two paths from a matching scikit-learn version.
+
+`run.py` stores both metric dicts in `results.duckdb`
 (`meta.model1_metrics_json`, `meta.model2_metrics_json`). The dashboard header
-reads them: `M1 AUC 0.87 · M2 MAE 6.5d`.
-
-### Persisting the trained models (optional)
-
-Models retrain on every `run.py` call (fine for the demo). To train once and
-reuse:
-
-```python
-import joblib
-joblib.dump(clf, "data/model1.joblib")
-joblib.dump(reg, "data/model2.joblib")
-# later
-clf = joblib.load("data/model1.joblib")
-reg = joblib.load("data/model2.joblib")
-```
+reads them: `M1 AUC 0.87 · M2 MAE 5.6d`.
 
 ---
 
@@ -153,7 +161,8 @@ reg = joblib.load("data/model2.joblib")
 |---|---|
 | When Model 2 fires | `config.RISK_THRESHOLD` (0.5) |
 | Holdout window | `agent.HOLDOUT_WEEKS` (6) |
-| Model 2 estimator / hyperparams | `train_delay_model` — swap `GradientBoostingRegressor(...)` args, or `Ridge()` |
+| Model 2 estimator / hyperparams | `train_delay_model` — matches `models/Model2.ipynb`; edit there and `--retrain` |
+| Use different pre-trained artifacts | drop `.joblib` files at `models/model1_logistic_regression.joblib` / `models/model2.joblib` |
 | Features | `agent._features` (add a column → both models use it) |
 | Severity / segment cutoffs | `agent.make_risk_fn` |
-| Verify nothing broke | `./.venv/bin/python -m pytest -q` (28 tests) |
+| Verify nothing broke | `./.venv/bin/python -m pytest -q` (36 tests) |
