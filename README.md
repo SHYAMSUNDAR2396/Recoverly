@@ -5,8 +5,8 @@ Built for the **Razorpay AI Buildathon 2026 · Track 03 — AI Revenue Recovery*
 
 ![Razorpay AI Buildathon 2026](https://img.shields.io/badge/Razorpay%20AI%20Buildathon-2026%20Track%2003-1364F1)
 ![Python 3](https://img.shields.io/badge/python-3-blue)
-![Tests](https://img.shields.io/badge/tests-36%20passing-brightgreen)
-![License](https://img.shields.io/badge/license-unpublished-lightgrey)
+![Tests](https://img.shields.io/badge/tests-38%20passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 Source problem: *"Why can't SMEs negotiate favorable payment terms with large buyers?"* —
 [Fix My Itch](https://razorpay.com) score **82.8**, the highest-scored B2B Services
@@ -187,5 +187,4 @@ dashboard's live-send work on any invoice, not just one picked to fit under the 
 
 ## License
 
-Not yet published under a license — all rights reserved by the author pending the
-buildathon submission.
+[MIT](LICENSE) — © 2026 shyamsundar m.
