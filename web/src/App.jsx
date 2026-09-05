@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getInvoices, getMetrics, getExceptions, getBuyers, getBrief, getAudit } from "./api.js";
+import { getInvoices, getMetrics, getExceptions, getBuyers, getBrief, getAudit, postLiveSend } from "./api.js";
 
 /* ---------- Razorpay Blade tokens ---------- */
 const C = {
@@ -229,6 +229,8 @@ function InvoiceDetail({ id, row }) {
         ) : null;
       })()}
 
+      <LiveDemoSend invoiceId={row.invoice_id} />
+
       <div style={{ marginTop: 18, fontSize: 11, color: C.mute, marginBottom: 7 }}>Audit trail</div>
       {!audit ? <Loading /> : audit.length === 0
         ? <div style={{ fontSize: 13, color: C.mute }}>No agent actions recorded (control group, or never reached a rung).</div>
@@ -251,6 +253,68 @@ function InvoiceDetail({ id, row }) {
             ))}
           </div>
         )}
+    </div>
+  );
+}
+
+function LiveDemoSend({ invoiceId }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("idle");     // idle | sending | done | error
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => { setStatus("idle"); setResult(null); setError(null); }, [invoiceId]);
+
+  const send = () => {
+    if (!email || status === "sending") return;
+    setStatus("sending"); setError(null); setResult(null);
+    postLiveSend(invoiceId, email)
+      .then((r) => { setResult(r); setStatus("done"); })
+      .catch((e) => { setError(e.message); setStatus("error"); });
+  };
+
+  return (
+    <div style={{ marginTop: 18, border: `1px solid ${C.blueFaintBd}`, background: C.blueFaintBg,
+      borderRadius: 8, padding: 16 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: C.blueDk, textTransform: "uppercase",
+        letterSpacing: ".06em" }}>Live demo send</div>
+      <div style={{ fontSize: 12, color: "#4F585F", marginTop: 5, lineHeight: 1.5 }}>
+        Creates one real Razorpay test-mode link for this invoice and sends the LLM-written
+        email — containing that link — to the address below.
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          style={{ flex: 1, padding: "9px 11px", borderRadius: 6, border: `1px solid ${C.bd}`,
+            fontSize: 13, background: "#fff" }} />
+        <button onClick={send} disabled={!email || status === "sending"}
+          style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 6,
+            padding: "9px 16px", fontSize: 13, fontWeight: 600,
+            cursor: email && status !== "sending" ? "pointer" : "not-allowed",
+            opacity: !email || status === "sending" ? 0.6 : 1 }}>
+          {status === "sending" ? "Sending…" : "Send live demo email"}
+        </button>
+      </div>
+
+      {status === "error" && (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#AA180E" }}>Failed: {error}</div>
+      )}
+
+      {status === "done" && result && (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: "#191D1F", lineHeight: 1.6 }}>
+          {result.warning && (
+            <div style={{ color: "#C75300", marginBottom: 6 }}>{result.warning}</div>
+          )}
+          <div>
+            Link: <a href={result.pay_url} target="_blank" rel="noreferrer">{result.pay_url}</a>
+            {" "}— <b>{result.link_live ? "real Razorpay link" : "fell back to simulated"}</b>
+          </div>
+          <div style={{ marginTop: 3 }}>
+            Email to <b>{result.sent_to}</b>: <b>{result.email_live ? "sent live" : "fell back to dry-run"}</b>
+            {" "}({result.email_message_id})
+          </div>
+        </div>
+      )}
     </div>
   );
 }

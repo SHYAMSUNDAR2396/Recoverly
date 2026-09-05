@@ -166,16 +166,24 @@ For a featured buyer (`brief.MIN_SAMPLE`, n ≥ 20, enforced), one page:
 
 Same split as the ladder: deterministic recommendation, generative language.
 
-### 9. Dashboard (React SPA + read-only API)
+### 9. Dashboard (React SPA + read-only API, plus one live action)
 - **`api.py`** — FastAPI, read-only `GET` over `results.duckdb`:
   `/invoices` · `/metrics` · `/buyers` · `/buyers/{id}/brief` · `/audit` · `/exceptions`.
-  No writes, no auth, no webhook. `/metrics` returns `model1` + `model2` metrics.
+  No auth, no webhook. `/metrics` returns `model1` + `model2` metrics.
+- **One deliberate exception:** `POST /demo/live-send` — from the Queue detail panel's
+  "Live demo send" box, type any email and click send: it creates one real Razorpay
+  test-mode link for that invoice, composes the LLM-written email (same `agent.compose_email`
+  the pipeline uses), and sends it live over SMTP to that address. Same credentials-from-env,
+  fall-back-on-failure discipline as the CLI's `--live-link`/`--demo-email`. It does **not**
+  write to `results.duckdb` — the outcome is returned directly and shown inline, not
+  persisted; re-running `run.py` is what makes something show up in the audit trail.
 - **`web/`** — Vite + React SPA (`web/src/App.jsx`), three views: **Queue** (invoice list +
-  live audit-trail detail panel, shows Model 1 P(late) and Model 2 predicted delay),
-  **Recovery results** (treatment vs control, the RESPONSE_LIFT honesty note, exception
-  list), **Leverage brief** (buyer switcher + the brief). Razorpay Blade palette (azure
-  `#1364F1`, navy `#021331`), Inter, ~1 component file.
-- The pipeline writes `results.duckdb`; the API only reads it; the SPA only renders.
+  live audit-trail detail panel, shows Model 1 P(late), Model 2 predicted delay, and the
+  live-send box), **Recovery results** (treatment vs control, the RESPONSE_LIFT honesty
+  note, exception list), **Leverage brief** (buyer switcher + the brief). Razorpay Blade
+  palette (azure `#1364F1`, navy `#021331`), Inter, ~2 component files.
+- The pipeline writes `results.duckdb`; every `GET` endpoint only reads it; the SPA only
+  renders — except the one `POST` above, which is a live action, not a data mutation.
 
 ### 10. Reports honestly (treatment vs control)
 - **253 invoices** split 70% treatment / 30% control (holdout, no agent contact),
@@ -298,7 +306,7 @@ Same split as the ladder: deterministic recommendation, generative language.
 | `notify.py` | Mailer (mirrors `razorpay_link.py`) — dry-run by default; `live=True` sends one real SMTP email for the `--live-link` / `--demo-email` invoice, fallback on failure |
 | `metrics.py` | Treatment vs control · cash pulled forward · net benefit · `interpretation` string · exception list |
 | `run.py` | Orchestrator → `results.duckdb`. Flags: `--no-llm`, `--fresh`, `--live-link INV-XXXX` |
-| `api.py` | FastAPI — read-only `GET` over `results.duckdb`. No writes, no auth, no webhook |
+| `api.py` | FastAPI — read-only `GET` over `results.duckdb`, plus `POST /demo/live-send` (one live Razorpay link + email, no DB write). No auth, no webhook |
 | `web/` | Vite + React SPA — three views, fetches from `api.py`. Razorpay Blade palette, ~1 component file, no Redux, no router |
 | `test_engine.py` | **38 pytest tests** — the three silent-failure gaps, every `BOUNDS` predicate via `parametrize`, the ladder boundaries, the risk cascade gate, the buyer-email rules, the demo beats, determinism |
 
@@ -402,7 +410,8 @@ Razorpay APIs for a production version are catalogued in `RAZORPAY_API.md`.
 - Real payment settlement / webhook reconciliation (test-mode link proves connectivity, not settlement)
 - Hourly simulation clock (day granularity + assigned timestamps covers the bound)
 - Full test coverage (38 tests target silent-failure paths and the demo beats; ledger stats, brief formatting, React rendering untested by choice)
-- Auth, write endpoints, or a webhook on `api.py` — read-only `GET` only
+- Auth or a webhook on `api.py` — every `GET` is read-only; the one `POST` (`/demo/live-send`)
+  is a live action, not a data-mutation endpoint, and never touches `results.duckdb`
 - A hosted LLM — local via Ollama; the only external call is one Razorpay test-mode link
 - LLM fine-tuning — `llama3.1:8b` is used as-shipped; behavior is prompt + `temp 0` only
 - Real email transmission — `notify.send(live=True)` is a guarded stub; no SES/SMTP wired. WhatsApp and inbound-reply handling are also out.

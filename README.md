@@ -151,7 +151,7 @@ ollama serve
 | `notify.py` | Dry-run mailer — logs the composed buyer email instead of sending it. |
 | `metrics.py` | Treatment vs control, cash pulled forward, net benefit, exception list. |
 | `run.py` | Orchestrates all of the above → `results.duckdb`. |
-| `api.py` | FastAPI, read-only `GET` over `results.duckdb` — `/invoices` `/metrics` `/audit` `/exceptions` `/buyers` `/buyers/{id}/brief`. |
+| `api.py` | FastAPI, read-only `GET` over `results.duckdb` — `/invoices` `/metrics` `/audit` `/exceptions` `/buyers` `/buyers/{id}/brief`. One deliberate exception: `POST /demo/live-send` triggers one real Razorpay link + one real email for a chosen invoice/address (doesn't write to `results.duckdb`). |
 | `web/` | Vite + React dashboard — Queue, Recovery results, Leverage brief. |
 | `landing/` | Standalone marketing landing page (`index.html`) plus its design-canvas source. |
 | `test_engine.py` | 36 tests — silent-failure gaps, every `BOUNDS` predicate, the risk-cascade gate, buyer-email rules, ladder boundaries, determinism. |
