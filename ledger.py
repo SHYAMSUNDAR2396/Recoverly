@@ -97,12 +97,13 @@ def _build_invoices(buyers: pd.DataFrame, rng: np.random.Generator) -> pd.DataFr
     for _, b in buyers.iterrows():
         count = config.HEAVY_INVOICES if b.tier == "heavy" else config.LIGHT_INVOICES
         count = int(rng.integers(count - 3, count + 4))
-        base_amt = 600_000 if b.tier == "heavy" else 180_000
+        base_amt = 220_000 if b.tier == "heavy" else 70_000
         for _ in range(count):
             issue = config.SIM_START + dt.timedelta(days=int(rng.integers(0, span_days)))
             terms = int(rng.choice(config.TERMS_CHOICES))
             due = issue + dt.timedelta(days=terms)
-            amount = float(np.round(rng.lognormal(mean=np.log(base_amt), sigma=0.5), -3))
+            amount = float(np.round(rng.lognormal(mean=np.log(base_amt), sigma=0.35), -3))
+            amount = min(amount, config.MAX_INVOICE_AMOUNT)   # every invoice stays clickable
             squeeze = _month_end_squeeze(due, b.qend_squeeze)
             natural_dbt = int(round(rng.normal(b.dbt_mean * squeeze, b.dbt_sd)))
             natural_dbt = max(natural_dbt, -10)

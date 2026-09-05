@@ -199,7 +199,8 @@ BOUND_CASES = {
                          _state(last_touch_day=_MONDAY - dt.timedelta(days=1))),
     "business_hours":   (_state(), _state()),          # pass on Mon, fail on Sat (day arg)
     "discount_cap_2pc": (_state(proposed_discount=0.02), _state(proposed_discount=0.05)),
-    "maker_checker":    (_state(amount=999_999.0), _state(amount=1_500_000.0)),
+    "maker_checker":    (_state(amount=config.MAKER_CHECKER_THRESHOLD - 1),
+                        _state(amount=config.MAKER_CHECKER_THRESHOLD + 500_000)),
 }
 
 @pytest.mark.parametrize("name,pred", engine.BOUNDS)

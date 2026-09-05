@@ -31,9 +31,9 @@ leverage.
 | Companion docs | `README.md` · `DATA_MODEL.md` · `MODEL_TRAINING.md` · `RAZORPAY_API.md` |
 
 **Latest run (`SEED=42`, `--no-llm`):**
-253 invoices · 20 buyers · paid 213 · escalated 33 · unresolved 7 · exceptions 29 ·
-DSO −3.1 days · Model 1 AUC 0.869 · Model 2 MAE 5.6d vs 7.0d baseline ·
-net benefit ≈ −₹5k (see feature 10).
+253 invoices, every one under ₹4,90,000 · 20 buyers · paid 217 · escalated 29 ·
+exceptions 26 · DSO −2.8 days · Model 1 AUC 0.873 · Model 2 MAE 5.4d vs 7.0d baseline ·
+net benefit ≈ −₹2k (see feature 10).
 
 ---
 
@@ -91,7 +91,7 @@ engine, the tests, and the audit rows:
 | `min_gap_72h` | ≥ 72 hours between touches |
 | `business_hours` | Weekdays only; every action stamped 09:00–19:00 IST (deterministic, seeded from `invoice_id`) |
 | `discount_cap_2pc` | Discount authority ≤ 2%; anything beyond → human |
-| `maker_checker` | No autonomous action on invoices above `MAKER_CHECKER_THRESHOLD` (₹10L) |
+| `maker_checker` | No autonomous action on invoices above `MAKER_CHECKER_THRESHOLD` (₹3.5L) |
 
 **Stop conditions** — terminal vs silent hold:
 - Dispute raised → **terminal**: fires the stage-5 escalation, writes the human-handoff audit row
@@ -115,9 +115,12 @@ escalates, and sets `human_gate_required = true`.
   zero network calls, deterministic ids.
 - **Demo invoice:** `run.py --live-link INV-2032` creates **exactly one** real Razorpay
   **test-mode** payment link during the run (stage 0), simulates every other. Needs
-  `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` in the env; the invoice amount must be under
-  Razorpay's ₹5,00,000 test-mode cap (`INV-2032` is ₹4,97,000). On any failure the adapter
-  falls back to a simulated id and says so — the demo never breaks.
+  `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` (loaded from `.env`). Every generated invoice
+  is capped at `config.MAX_INVOICE_AMOUNT` (₹4,90,000), under Razorpay's ₹5,00,000
+  test-mode cap — any invoice id works, not just one picked to fit under it. On any
+  failure the adapter falls back to a simulated id and says so — the demo never breaks.
+  Re-running on an invoice that already has a real link reuses it (via its
+  `reference_id`) instead of erroring or faking a new one.
 - The link carries `customer` (the buyer's AP contact), `notify: {sms: true, email: false}`
   and `reminder_enable: true` — Razorpay texts the link and auto-nudges it; the
   personalized email is `notify.py`'s job.
@@ -387,7 +390,7 @@ Same split as the ladder: deterministic recommendation, generative language.
 |---|---|
 | Data / ledger | Python + pandas + DuckDB (in-process); parquet |
 | ML — Model 1 | `sklearn` `LogisticRegression` (late / not-late) |
-| ML — Model 2 | `sklearn` `GradientBoostingRegressor(n_estimators=100, learning_rate=0.03, max_depth=2)` (expected days late, late-only) — tuned config from `models/Model2.ipynb`; MAE 5.6d vs 7.0d baseline |
+| ML — Model 2 | `sklearn` `GradientBoostingRegressor(n_estimators=100, learning_rate=0.03, max_depth=2)` (expected days late, late-only) — tuned config from `models/Model2.ipynb`; MAE 5.4d vs 7.0d baseline |
 | ML — artifacts | `models/*.joblib`, loaded by `agent.load_or_train_models`; re-fit + rewritten on version-skew or `--retrain` |
 | Agent | Local LLM via **Ollama** (`llama3.1:8b`, `temp 0`) — diagnosis + drafting only, optional, rule-based fallback |
 | Payments | `razorpay` PyPI SDK, test-mode keys — the one and only external network call; link carries `customer` + `notify` |

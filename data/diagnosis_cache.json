@@ -1108,5 +1108,12 @@
 "llm:INV-2137:1": "stretch",
 "llm:INV-2153:16": "stretch",
 "llm:INV-2166:15": "stretch",
-"llm:INV-2181:17": "stretch"
+"llm:INV-2181:17": "stretch",
+"rule:INV-2103:-5": "cashflow",
+"rule:INV-2134:-5": "cashflow",
+"rule:INV-2063:-5": "cashflow",
+"rule:INV-2063:2": "cashflow",
+"rule:INV-2159:-4": "stretch",
+"rule:INV-2159:0": "stretch",
+"rule:INV-2159:7": "stretch"
 }
