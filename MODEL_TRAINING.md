@@ -165,4 +165,4 @@ reads them: `M1 AUC 0.87 · M2 MAE 5.6d`.
 | Use different pre-trained artifacts | drop `.joblib` files at `models/model1_logistic_regression.joblib` / `models/model2.joblib` |
 | Features | `agent._features` (add a column → both models use it) |
 | Severity / segment cutoffs | `agent.make_risk_fn` |
-| Verify nothing broke | `./.venv/bin/python -m pytest -q` (36 tests) |
+| Verify nothing broke | `./.venv/bin/python -m pytest -q` (38 tests) |

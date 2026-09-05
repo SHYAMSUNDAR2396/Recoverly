@@ -126,6 +126,7 @@ Run the tests:
 | `--fresh` | Regenerate the committed synthetic ledger |
 | `--retrain` | Re-fit Model 1 + Model 2 and overwrite `models/*.joblib` |
 | `--live-link INV-2032` | Create **one** real Razorpay test-mode payment link (needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`; invoice must be under the ₹5,00,000 test-mode cap) |
+| `--live-link INV-2032 --demo-email you@gmail.com` | + actually **sends** that invoice's LLM-written email, containing the real link, to `you@gmail.com` over SMTP (needs `SMTP_USER`/`SMTP_PASSWORD` — a Gmail address + an [App Password](https://myaccount.google.com/apppasswords), not your normal password). Any failure falls back to dry-run; every other email in the run stays dry-run. |
 
 Local LLM (optional, everything above works without it):
 

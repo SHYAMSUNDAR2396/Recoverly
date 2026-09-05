@@ -103,7 +103,8 @@ def _fallback_compose(f: dict) -> str:
 
 def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None, compose_fn=None,
         force_discount: dict[str, float] | None = None,
-        live_link_invoice: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+        live_link_invoice: str | None = None,
+        live_email_to: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Run the simulation. Returns (audit_df, invoices_final_df).
 
     risk_fn(state) -> {p_late, expected_delay_days, severity, segment}  (see
@@ -113,6 +114,10 @@ def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None, comp
 
     live_link_invoice: if set, that one invoice's payment link is created for
     real (Razorpay test mode); every other link is simulated.
+
+    live_email_to: if set (together with live_link_invoice), that invoice's
+    first email carrying a real payment link is actually sent to this address
+    over SMTP, exactly once; every other email stays dry-run.
     """
     diagnose_fn = diagnose_fn or (lambda inv, ctx: "undiagnosed")
     risk_fn = risk_fn or (lambda inv: dict(_NO_RISK))
@@ -135,6 +140,7 @@ def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None, comp
     }
     broken_promises: dict[str, int] = {}     # buyer_id -> count
     stop_promises: set[str] = set()          # buyers whose promises no longer buy silence
+    demo_sent: set[str] = set()               # invoices whose demo email already went out live
     audit: list[dict] = []
 
     def escalate(s: _State, day: dt.date, reason: str) -> None:
@@ -260,7 +266,14 @@ def run(ledger: dict[str, pd.DataFrame], *, diagnose_fn=None, risk_fn=None, comp
             body = compose_fn(facts)
             to = b["email"] if b is not None else "unknown@unknown.example"
             subject = f"{s.invoice_id}: payment {_STAGE_ACTION[stage].replace('_', ' ')}"
-            msg_id = notify.send(to, subject, body, live=False)
+
+            is_demo_send = (s.invoice_id == live_link_invoice and live_email_to
+                            and pay_url and s.invoice_id not in demo_sent)
+            if is_demo_send:
+                to = live_email_to
+            msg_id = notify.send(to, subject, body, live=bool(is_demo_send))
+            if is_demo_send and msg_id.startswith("msg_live_"):
+                demo_sent.add(s.invoice_id)   # succeeded live; don't resend at a later stage
 
             s.touches += 1
             s.last_touch_day = day

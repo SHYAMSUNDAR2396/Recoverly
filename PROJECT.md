@@ -25,7 +25,7 @@ leverage.
 | | |
 |---|---|
 | Pipeline | `python run.py --no-llm` completes end to end and writes `results.duckdb` |
-| Tests | **36 pytest tests**, green (`python -m pytest -q`) |
+| Tests | **38 pytest tests**, green (`python -m pytest -q`) |
 | Dashboard | `uvicorn api:app` + `web/` (Vite + React) on the demo path |
 | Live Razorpay | one real test-mode payment link proven (`plink_…`), wired as `run.py --live-link INV-2032` |
 | Companion docs | `README.md` · `DATA_MODEL.md` · `MODEL_TRAINING.md` · `RAZORPAY_API.md` |
@@ -130,10 +130,14 @@ Every rung 0–4 composes a full personalized email to the buyer's AP contact
 template on the `--no-llm` path, cached by `(invoice_id, stage)` at `temp 0`). Tone scales
 with the rung; the ask is conditioned on the diagnosis (a `stretch` buyer at stage 3 gets a
 firm notice, not the discount). The internal diagnosis label and the leverage brief are
-**never** named to the buyer. `notify.py` is a **dry-run mailer** (mirrors
-`razorpay_link.py`): it records `email_to` / `email_body` / `email_message_id` on the audit
-row and shows them in the dashboard; `live=True` is a guarded stub. Recipient addresses use
-the reserved `.example` TLD — no real inbox is reachable. Terminal stops (dispute, opt-out,
+**never** named to the buyer. `notify.py` mirrors `razorpay_link.py`: dry-run by default
+(records `email_to` / `email_body` / `email_message_id` on the audit row and shows them in
+the dashboard), `live=True` sends for real over SMTP (stdlib `smtplib`, credentials from
+`SMTP_USER`/`SMTP_PASSWORD` env vars only). `run.py --live-link INV-2032 --demo-email
+you@gmail.com` sends **exactly one** real email — that invoice's first touch carrying the
+real Razorpay link — to the given address; every other email in the run stays dry-run to
+the buyer's synthetic `.example` address. Any SMTP failure falls back to dry-run so the
+demo never breaks. Terminal stops (dispute, opt-out,
 stage 5) send **nothing** to the buyer — the escalation is for a human at the SME.
 
 ### 7. Leaves an audit trail
@@ -291,12 +295,12 @@ Same split as the ladder: deterministic recommendation, generative language.
 | `models/` | Committed artifacts `model1_logistic_regression.joblib` + `model2.joblib` and the notebooks (`model1.ipynb` / `Model2.ipynb`) that trained them. `run.py` loads them; `--retrain` regenerates |
 | `brief.py` | Per-buyer leverage brief — deterministic recommended terms, generative justification, `None`-safe `promise_kept_rate` |
 | `razorpay_link.py` | Link adapter with a `live` flag — simulated batch, one real test-mode call, `customer`/`notify`/`reminders`, cache + graceful fallback (named `_link` so it does not shadow the `razorpay` SDK) |
-| `notify.py` | Dry-run mailer (mirrors `razorpay_link.py`) — records the email on the audit row; `live=True` is a guarded stub; recipients are `.example` |
+| `notify.py` | Mailer (mirrors `razorpay_link.py`) — dry-run by default; `live=True` sends one real SMTP email for the `--live-link` / `--demo-email` invoice, fallback on failure |
 | `metrics.py` | Treatment vs control · cash pulled forward · net benefit · `interpretation` string · exception list |
 | `run.py` | Orchestrator → `results.duckdb`. Flags: `--no-llm`, `--fresh`, `--live-link INV-XXXX` |
 | `api.py` | FastAPI — read-only `GET` over `results.duckdb`. No writes, no auth, no webhook |
 | `web/` | Vite + React SPA — three views, fetches from `api.py`. Razorpay Blade palette, ~1 component file, no Redux, no router |
-| `test_engine.py` | **36 pytest tests** — the three silent-failure gaps, every `BOUNDS` predicate via `parametrize`, the ladder boundaries, the risk cascade gate, the buyer-email rules, the demo beats, determinism |
+| `test_engine.py` | **38 pytest tests** — the three silent-failure gaps, every `BOUNDS` predicate via `parametrize`, the ladder boundaries, the risk cascade gate, the buyer-email rules, the demo beats, determinism |
 
 ### Key design rules
 
@@ -379,7 +383,7 @@ Same split as the ladder: deterministic recommendation, generative language.
 | ML — artifacts | `models/*.joblib`, loaded by `agent.load_or_train_models`; re-fit + rewritten on version-skew or `--retrain` |
 | Agent | Local LLM via **Ollama** (`llama3.1:8b`, `temp 0`) — diagnosis + drafting only, optional, rule-based fallback |
 | Payments | `razorpay` PyPI SDK, test-mode keys — the one and only external network call; link carries `customer` + `notify` |
-| Email | `notify.py` — dry-run mailer, `live=True` a guarded SES/SMTP stub; personalized body from `agent.compose_email` |
+| Email | `notify.py` — dry-run by default; `live=True` sends one real SMTP email (`SMTP_USER`/`SMTP_PASSWORD`) for the demo invoice; personalized body from `agent.compose_email` |
 | Clock | `pandas.date_range` in a `for` loop |
 | Orchestration | `run.py` (`--no-llm` / `--fresh` / `--live-link`) |
 | API | FastAPI — read-only `GET` over `results.duckdb`, `uvicorn` |
@@ -397,7 +401,7 @@ Razorpay APIs for a production version are catalogued in `RAZORPAY_API.md`.
 - Tamper-proof audit (append-only by convention + timestamp only)
 - Real payment settlement / webhook reconciliation (test-mode link proves connectivity, not settlement)
 - Hourly simulation clock (day granularity + assigned timestamps covers the bound)
-- Full test coverage (36 tests target silent-failure paths and the demo beats; ledger stats, brief formatting, React rendering untested by choice)
+- Full test coverage (38 tests target silent-failure paths and the demo beats; ledger stats, brief formatting, React rendering untested by choice)
 - Auth, write endpoints, or a webhook on `api.py` — read-only `GET` only
 - A hosted LLM — local via Ollama; the only external call is one Razorpay test-mode link
 - LLM fine-tuning — `llama3.1:8b` is used as-shipped; behavior is prompt + `temp 0` only
@@ -410,7 +414,7 @@ Razorpay APIs for a production version are catalogued in `RAZORPAY_API.md`.
 ## Resolved
 
 **Integration risk (previously open):** the pipeline is built and runs end to end;
-`run.py --no-llm` → `results.duckdb` → `api.py` → `web/` all work, 36 tests green. No
+`run.py --no-llm` → `results.duckdb` → `api.py` → `web/` all work, 38 tests green. No
 blocking integration issues surfaced. Remaining polish: swap Model 2 to `Ridge`/Poisson for
 the synthetic build, add the buyer-mean baseline to the metrics, record the video.
 
