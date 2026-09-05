@@ -88,7 +88,12 @@ git clone https://github.com/SHYAMSUNDAR2396/Recoverly.git
 cd Recoverly
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
+cp .env.example .env   # fill in RAZORPAY_KEY_ID/SECRET and SMTP_USER/PASSWORD if you
+                       # want the live-link/demo-email paths; leave blank otherwise
 ```
+
+`.env` is gitignored and loaded automatically by both `run.py` and `api.py` — fill it in
+once and every terminal/process picks it up, no more manual `export` per shell.
 
 Run the full pipeline (ledger → risk cascade → collections engine → metrics →
 `results.duckdb`):
@@ -125,7 +130,8 @@ Run the tests:
 | `--no-llm` | Skip Ollama — rule-based diagnosis, template emails, fully offline |
 | `--fresh` | Regenerate the committed synthetic ledger |
 | `--retrain` | Re-fit Model 1 + Model 2 and overwrite `models/*.joblib` |
-| `--live-link INV-2032` | Create **one** real Razorpay test-mode payment link (needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`; invoice must be under the ₹5,00,000 test-mode cap) |
+| `--live-link INV-2032` | Create **one** real Razorpay test-mode payment link (needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`). Every generated invoice is under ₹4,90,000, so any invoice id works — Razorpay's ₹5,00,000 test-mode cap is never hit. |
+| `--live-link INV-2032 --demo-email you@gmail.com` | + actually **sends** that invoice's LLM-written email, containing the real link, to `you@gmail.com` over SMTP (needs `SMTP_USER`/`SMTP_PASSWORD` — a Gmail address + an [App Password](https://myaccount.google.com/apppasswords), not your normal password). Any failure falls back to dry-run; every other email in the run stays dry-run. |
 
 Local LLM (optional, everything above works without it):
 
@@ -150,7 +156,7 @@ ollama serve
 | `notify.py` | Dry-run mailer — logs the composed buyer email instead of sending it. |
 | `metrics.py` | Treatment vs control, cash pulled forward, net benefit, exception list. |
 | `run.py` | Orchestrates all of the above → `results.duckdb`. |
-| `api.py` | FastAPI, read-only `GET` over `results.duckdb` — `/invoices` `/metrics` `/audit` `/exceptions` `/buyers` `/buyers/{id}/brief`. |
+| `api.py` | FastAPI, read-only `GET` over `results.duckdb` — `/invoices` `/metrics` `/audit` `/exceptions` `/buyers` `/buyers/{id}/brief`. One deliberate exception: `POST /demo/live-send` triggers one real Razorpay link + one real email for a chosen invoice/address (doesn't write to `results.duckdb`). |
 | `web/` | Vite + React dashboard — Queue, Recovery results, Leverage brief. |
 | `landing/` | Standalone marketing landing page (`index.html`) plus its design-canvas source. |
 | `test_engine.py` | 36 tests — silent-failure gaps, every `BOUNDS` predicate, the risk-cascade gate, buyer-email rules, ladder boundaries, determinism. |
@@ -166,14 +172,18 @@ project is the one Razorpay test-mode payment link.
 ## On the numbers
 
 The data is synthetic, so both risk models partly recover their own generator —
-Model 1 AUC ≈ 0.87, Model 2 MAE ≈ 5.6 days vs a ≈ 7.0-day mean baseline. The claim
+Model 1 AUC ≈ 0.87, Model 2 MAE ≈ 5.4 days vs a ≈ 7.0-day mean baseline. The claim
 is the two-stage pipeline, not the scores.
 
 The treatment effect exists **only** because of the authored, benchmark-anchored
 `RESPONSE_LIFT` assumption in `config.py`. The control group proves the measurement
-machinery is correct; it does not prove the agent works. Headline result: DSO −3.1
+machinery is correct; it does not prove the agent works. Headline result: DSO −2.8
 days from the free reminder rungs; the stage-3 discount rung runs near break-even
 and is a tuning lever, not hidden.
+
+Every invoice is capped under ₹4,90,000 (`config.MAX_INVOICE_AMOUNT`) — below
+Razorpay's ₹5,00,000 test-mode Payment Links limit — so `--live-link` and the
+dashboard's live-send work on any invoice, not just one picked to fit under the cap.
 
 ## License
 

@@ -282,7 +282,7 @@ def make_diagnose_fn(buyers: pd.DataFrame, use_ollama: bool = True):
     def diagnose(state, ctx: dict) -> str:
         buyer = b.loc[state.buyer_id] if state.buyer_id in b.index else None
         rule = diagnose_rule(state, ctx, buyer)
-        key = f"{state.invoice_id}:{ctx.get('dbt')}"
+        key = f"{'llm' if use_ollama else 'rule'}:{state.invoice_id}:{ctx.get('dbt')}"
         if key in cache:
             return cache[key]
         label = rule
@@ -329,7 +329,7 @@ def draft_justification(facts: dict) -> str:
     prompt = (
         "Write one persuasive but professional paragraph (<=90 words) a supplier "
         "would send to a large buyer to justify revising payment terms. Use only these facts: "
-        + json.dumps(facts) + " Do not invent numbers."
+        + json.dumps(facts, ensure_ascii=False) + " Do not invent numbers."
     )
     out = _ollama(prompt, timeout=12.0)
     return out or template
@@ -389,7 +389,7 @@ def compose_email(facts: dict) -> str:
         "internal analysis, model, score, or negotiation brief.\n"
         "- Keep every number and the payment URL verbatim. Invent nothing.\n"
         f"- Sign off as: {facts['signatory']}, {facts['sme_name']}.\n"
-        "Facts: " + json.dumps({k: v for k, v in facts.items() if k != "sme_name"})
+        "Facts: " + json.dumps({k: v for k, v in facts.items() if k != "sme_name"}, ensure_ascii=False)
     )
     out = _ollama(prompt, timeout=15.0)
     if out and facts["invoice_id"] in out and (not facts.get("pay_url") or facts["pay_url"] in out):
@@ -402,7 +402,7 @@ def make_compose_fn(use_ollama: bool = True):
     cache = _load_cache(_EMAIL_CACHE_PATH)
 
     def compose(facts: dict) -> str:
-        key = f"{facts['invoice_id']}:{facts['stage']}"
+        key = f"{'llm' if use_ollama else 'rule'}:{facts['invoice_id']}:{facts['stage']}"
         if key in cache:
             return cache[key]
         body = compose_email(facts) if use_ollama else _email_template(facts)

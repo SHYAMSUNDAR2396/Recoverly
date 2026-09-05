@@ -48,7 +48,10 @@ EARLY_SETTLEMENT_DISCOUNT = 0.005    # what stage 3 actually offers; 2% is the c
 
 # --- risk cascade --------------------------------------------------------------
 RISK_THRESHOLD = 0.5                 # Model 1 P(late) at/above which Model 2 (delay) runs
-MAKER_CHECKER_THRESHOLD = 1_000_000  # ₹10L: above this, no autonomous action
+MAKER_CHECKER_THRESHOLD = 350_000    # above this, no autonomous action without sign-off
+MAX_INVOICE_AMOUNT = 490_000         # every invoice stays under Razorpay's ₹5,00,000
+                                     # test-mode Payment Links cap, so --live-link and
+                                     # the dashboard's live-send work on ANY invoice
 BUSINESS_HOUR_START = 9             # 09:00 IST
 BUSINESS_HOUR_END = 19             # 19:00 IST
 

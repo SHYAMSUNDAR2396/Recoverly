@@ -199,7 +199,8 @@ BOUND_CASES = {
                          _state(last_touch_day=_MONDAY - dt.timedelta(days=1))),
     "business_hours":   (_state(), _state()),          # pass on Mon, fail on Sat (day arg)
     "discount_cap_2pc": (_state(proposed_discount=0.02), _state(proposed_discount=0.05)),
-    "maker_checker":    (_state(amount=999_999.0), _state(amount=1_500_000.0)),
+    "maker_checker":    (_state(amount=config.MAKER_CHECKER_THRESHOLD - 1),
+                        _state(amount=config.MAKER_CHECKER_THRESHOLD + 500_000)),
 }
 
 @pytest.mark.parametrize("name,pred", engine.BOUNDS)
@@ -407,7 +408,7 @@ def test_razorpay_link_accepts_customer_kwargs():
                                     customer={"name": "A", "email": "a@x.example", "contact": "+910"},
                                     notify={"sms": True, "email": False})
     assert res["id"].startswith("plink_sim_")
-    assert res["short_url"].startswith("https://rzp.io/i/")
+    assert res["short_url"].startswith("https://simulated.invalid/pay/")
     assert isinstance(razorpay_link.create_link("INV-9", 250_000.0, live=False), str)
 
 
@@ -415,3 +416,33 @@ def test_notify_send_simulated():
     import notify
     mid = notify.send("ap@harbour.example", "INV-1: payment reminder", "body text")
     assert mid.startswith("msg_sim_")
+
+
+def test_notify_live_send_without_creds_falls_back(monkeypatch):
+    import notify
+    monkeypatch.delenv("SMTP_USER", raising=False)
+    monkeypatch.delenv("SMTP_PASSWORD", raising=False)
+    mid = notify.send("you@example.com", "subject", "body", live=True)
+    assert mid.startswith("msg_sim_")          # never raises, never blocks the demo
+
+
+def test_engine_sends_exactly_one_live_email_for_demo_invoice(monkeypatch):
+    calls = []
+    real_send = engine.notify.send
+
+    def spy(to, subject, body, *, live=False):
+        calls.append((to, live))
+        if live:
+            return "msg_live_test"                          # simulate a successful live send
+        return real_send(to, subject, body, live=False)
+
+    monkeypatch.setattr(engine.notify, "send", spy)
+    due = dt.date(2026, 2, 1)
+    L = _mini([dict(invoice_id="INV-D", due_date=due)])
+    engine.run(L, live_link_invoice="INV-D", live_email_to="you@x.example")
+
+    live_calls = [c for c in calls if c[1] is True]
+    assert len(live_calls) == 1
+    assert live_calls[0][0] == "you@x.example"
+    other_calls = [c for c in calls if c is not live_calls[0]]
+    assert all(not live for _, live in other_calls)

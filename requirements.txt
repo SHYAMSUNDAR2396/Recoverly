@@ -8,5 +8,6 @@ fastapi>=0.110
 uvicorn[standard]>=0.29
 requests>=2.31
 razorpay>=1.4          # only used by razorpay_link.create_link(live=True)
+python-dotenv>=1.0     # loads .env so credentials survive across terminals/processes
 pytest>=8.0
 httpx>=0.27
