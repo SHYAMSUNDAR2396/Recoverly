@@ -88,7 +88,12 @@ git clone https://github.com/SHYAMSUNDAR2396/Recoverly.git
 cd Recoverly
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
+cp .env.example .env   # fill in RAZORPAY_KEY_ID/SECRET and SMTP_USER/PASSWORD if you
+                       # want the live-link/demo-email paths; leave blank otherwise
 ```
+
+`.env` is gitignored and loaded automatically by both `run.py` and `api.py` — fill it in
+once and every terminal/process picks it up, no more manual `export` per shell.
 
 Run the full pipeline (ledger → risk cascade → collections engine → metrics →
 `results.duckdb`):

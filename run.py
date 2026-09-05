@@ -1,5 +1,9 @@
 """Orchestrator: ledger -> risk model -> engine -> metrics -> results.duckdb.
 
+Credentials (RAZORPAY_KEY_ID/SECRET, SMTP_USER/PASSWORD) are loaded from a
+.env file in the project root (see .env.example) - fill it in once, and every
+run/every terminal picks it up automatically. No more manual `export` per shell.
+
     ./.venv/bin/python run.py                    # normal run (loads models/ artifacts)
     ./.venv/bin/python run.py --no-llm           # skip Ollama, rule-based diagnosis only
     ./.venv/bin/python run.py --fresh            # regenerate the committed ledger
@@ -16,6 +20,10 @@ from __future__ import annotations
 
 import json
 import sys
+
+from dotenv import load_dotenv
+
+load_dotenv()          # populate os.environ from .env before anything reads it
 
 import duckdb
 import pandas as pd

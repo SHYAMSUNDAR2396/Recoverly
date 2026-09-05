@@ -6,11 +6,18 @@ real email) for a single invoice, on explicit request from the dashboard. It
 does not write to results.duckdb - it returns the outcome directly - so the
 "read-only over the database" claim for every other endpoint still holds.
 
+Credentials load from a .env file in the project root (see .env.example) - so
+`uvicorn` picks them up on its own regardless of which terminal starts it.
+
     ./.venv/bin/uvicorn api:app --reload
 """
 from __future__ import annotations
 
 import json
+
+from dotenv import load_dotenv
+
+load_dotenv()          # populate os.environ from .env before anything reads it
 
 import duckdb
 import pandas as pd
@@ -145,4 +152,33 @@ def demo_live_send(req: LiveSendRequest):
         "link_live": not link["id"].startswith("plink_sim_"),
         "email_message_id": msg_id, "email_live": msg_id.startswith("msg_live_"),
         "email_body": body, "warning": warning,
+    }
+
+
+class SendBriefRequest(BaseModel):
+    buyer_id: str
+    email: str
+
+
+@app.post("/demo/send-brief")
+def demo_send_brief(req: SendBriefRequest):
+    """Send a buyer's leverage-brief negotiation email for real.
+
+    Unlike /demo/live-send this carries no invoice or payment link - the brief
+    proposes a terms revision, it does not collect one payment - so it only
+    exercises notify.py, live=True, straight from the message already computed
+    by brief.buyer_brief() and stored in the `briefs` table.
+    """
+    rows = _rows("SELECT json FROM briefs WHERE buyer_id = ?", [req.buyer_id])
+    if not rows:
+        raise HTTPException(404, f"no brief for {req.buyer_id} (needs >= 20 invoices)")
+    b = json.loads(rows[0]["json"])
+
+    subject = f"{b['buyer']} — proposed terms revision"
+    msg_id = notify.send(req.email, subject, b["message"], live=True)
+
+    return {
+        "buyer_id": req.buyer_id, "buyer": b["buyer"], "sent_to": req.email,
+        "email_message_id": msg_id, "email_live": msg_id.startswith("msg_live_"),
+        "email_body": b["message"],
     }

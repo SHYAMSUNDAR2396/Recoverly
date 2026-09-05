@@ -407,7 +407,7 @@ def test_razorpay_link_accepts_customer_kwargs():
                                     customer={"name": "A", "email": "a@x.example", "contact": "+910"},
                                     notify={"sms": True, "email": False})
     assert res["id"].startswith("plink_sim_")
-    assert res["short_url"].startswith("https://rzp.io/i/")
+    assert res["short_url"].startswith("https://simulated.invalid/pay/")
     assert isinstance(razorpay_link.create_link("INV-9", 250_000.0, live=False), str)
 
 

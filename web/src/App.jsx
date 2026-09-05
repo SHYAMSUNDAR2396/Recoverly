@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getInvoices, getMetrics, getExceptions, getBuyers, getBrief, getAudit, postLiveSend } from "./api.js";
+import { getInvoices, getMetrics, getExceptions, getBuyers, getBrief, getAudit, postLiveSend, postSendBrief } from "./api.js";
 
 /* ---------- Razorpay Blade tokens ---------- */
 const C = {
@@ -472,8 +472,7 @@ function Leverage() {
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase",
                 color: C.mute, marginBottom: 10 }}>Message to buyer's AP lead</div>
               <div style={{ fontSize: 13, lineHeight: 1.75, whiteSpace: "pre-line" }}>{brief.message}</div>
-              <button style={{ marginTop: 16, fontSize: 14, fontWeight: 600, background: C.blue, color: "#fff",
-                border: "none", borderRadius: 8, padding: "11px 20px", cursor: "pointer" }}>Approve &amp; send</button>
+              <LiveBriefSend buyerId={sel} />
             </div>
           </div>
         </div>
@@ -481,6 +480,49 @@ function Leverage() {
     </div>
   );
 }
+function LiveBriefSend({ buyerId }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("idle");     // idle | sending | done | error
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => { setEmail(""); setStatus("idle"); setResult(null); setError(null); }, [buyerId]);
+
+  const send = () => {
+    if (!email || status === "sending") return;
+    setStatus("sending"); setError(null); setResult(null);
+    postSendBrief(buyerId, email)
+      .then((r) => { setResult(r); setStatus("done"); })
+      .catch((e) => { setError(e.message); setStatus("error"); });
+  };
+
+  return (
+    <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+        placeholder="you@example.com"
+        style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.bd}`,
+          fontSize: 14, background: "#fff" }} />
+      <button onClick={send} disabled={!email || status === "sending"}
+        style={{ fontSize: 14, fontWeight: 600, background: C.blue, color: "#fff", border: "none",
+          borderRadius: 8, padding: "11px 20px",
+          cursor: email && status !== "sending" ? "pointer" : "not-allowed",
+          opacity: !email || status === "sending" ? 0.6 : 1 }}>
+        {status === "sending" ? "Sending…" : "Approve & send"}
+      </button>
+
+      {status === "error" && (
+        <div style={{ alignSelf: "center", fontSize: 12, color: "#AA180E" }}>Failed: {error}</div>
+      )}
+      {status === "done" && result && (
+        <div style={{ alignSelf: "center", fontSize: 12, color: "#191D1F" }}>
+          To <b>{result.sent_to}</b>: <b>{result.email_live ? "sent live" : "fell back to dry-run"}</b>
+          {" "}({result.email_message_id})
+        </div>
+      )}
+    </div>
+  );
+}
+
 function metric(label, value, sub) {
   return (
     <div style={{ background: C.paper, borderRadius: 8, padding: 16 }}>
